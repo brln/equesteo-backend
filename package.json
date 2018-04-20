@@ -4,8 +4,7 @@
   "description": "",
   "main": "app.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "backend": "node app.babel.js"
+    "start": "node main.babel.js"
   },
   "author": "",
   "license": "ISC",
