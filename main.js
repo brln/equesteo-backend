@@ -9,10 +9,27 @@ import proxy from 'express-http-proxy'
 const TOP_SECRET_JWT_TOKEN = 'SUPER TOP SECRET PASSWORD CHANGE THIS'
 
 const app = express();
-const logger = function(req, res, next) {
-    console.log(`${req.method}: ${req.url}` );
+const logger = (req, res, next) => {
     next(); // Passing the request to the next handler in the stack.
-    console.log(res.status())
+    console.log(`${res.statusCode}: ${req.method}: ${req.url}` );
+}
+
+const authenticator = (req, res, next) => {
+  const authHeader = req.headers.authorization
+  if (authHeader) {
+    const token = req.headers.authorization.split('Bearer: ')[1]
+    const decoded = jwt.decode(token)
+    if (!token || !decoded) {
+      return res.status(401).json({error: 'Invalid Authorization header'})
+    }
+    const email = decoded.email
+    const userID = decoded.id
+    res.locals.userID = userID
+    res.locals.userEmail = email
+    next()
+  } else {
+    return res.status(401).json({error: 'Authorization header required'})
+  }
 }
 
 app.use(bodyParser.json());
@@ -38,7 +55,7 @@ app.get('/', (req, res) => {
   res.send('Hello World 2!');
 });
 
-// @TODO this endpoint needs authentication
+app.use('/couchproxy', authenticator)
 app.use('/couchproxy', proxy('http://equesteo:equesteo@localhost:15984', {
   proxyReqOptDecorator: (proxyReqOpts, srcReq) => {
     proxyReqOpts.headers['Authorization'] = 'Basic ' + Buffer.from(`${'equesteo'}:${"equesteo"}`).toString('base64')
@@ -56,7 +73,7 @@ app.post('/users', async (req, res) => {
   }
   const hashed = bcrypt.hashSync(password, bcrypt.genSaltSync(10));
   const newUser = await slouch.doc.create(USERS_DB, {email, password: hashed})
-  const token = jwt.sign({ email }, TOP_SECRET_JWT_TOKEN);
+  const token = jwt.sign({ id: newUser.id, email }, TOP_SECRET_JWT_TOKEN);
   return res.json({
     id: newUser.id,
     token
@@ -71,7 +88,7 @@ app.post('/users/login', async (req, res) => {
   if (!password || found.length < 1 || !bcrypt.compareSync(password, found[0].value)) {
     return res.status(401).json({'error': 'Wrong username/password'})
   } else if (found.length === 1) {
-    const token = jwt.sign({ email }, TOP_SECRET_JWT_TOKEN);
+    const token = jwt.sign({ id: found[0].id, email }, TOP_SECRET_JWT_TOKEN);
     return res.json({
       id: found[0].id,
       token

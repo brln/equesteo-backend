@@ -4,7 +4,7 @@
   "description": "",
   "main": "app.js",
   "scripts": {
-    "start": "node main.babel.js"
+    "start": "node $NODE_DEBUG_OPTION main.babel.js"
   },
   "author": "",
   "license": "ISC",
