@@ -1,0 +1,47 @@
+html { 
+  background: url(../images/bg1.jpg) no-repeat center center fixed;
+  -webkit-background-size: cover;
+  -moz-background-size: cover;
+  -o-background-size: cover;
+  background-size: cover;
+}
+
+#main-box {
+  height: 100vh;
+  padding: 0;
+  margin: 0;
+  display: -webkit-box;
+  display: -moz-box;
+  display: -ms-flexbox;
+  display: -webkit-flex;
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  margin-top: 20vh;
+}
+
+.logo {
+  font-family: 'Rock Salt', cursive;
+  color: #f2f2f7;
+  font-size: 12vh;
+}
+
+.main-text {
+  font-family: 'Quattrocento Sans', sans-serif;
+  color: #f2f2f7;
+  font-size: 3vh;
+}
+
+#inquiry-input {
+  height: 30px;
+  width: 240px;
+}
+
+#inquiry-submit {
+  font-family: 'Quattrocento Sans', sans-serif;
+  margin-top: 3vh;
+  height: 35px;
+  background: #f2f2f7;
+  border-radius: 8px;
+  border-width: 0px;
+}
