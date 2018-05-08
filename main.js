@@ -4,9 +4,14 @@ import Slouch from 'couch-slouch'
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import proxy from 'express-http-proxy'
+import aws from 'aws-sdk'
+import multer from 'multer'
+import multerS3 from 'multer-s3'
 
 import {
   configGet,
+  AWS_ACCESS_KEY_ID,
+  AWS_SECRET_ACCESS_KEY,
   COUCH_HOST,
   COUCH_PASSWORD,
   COUCH_USERNAME,
@@ -14,10 +19,18 @@ import {
 } from "./config"
 import { currentTime } from './helpers'
 
-const app = express();
+const app = express()
+const s3 = new aws.S3()
+
+aws.config.update({
+  secretAccessKey: configGet(AWS_SECRET_ACCESS_KEY),
+  accessKeyId: configGet(AWS_ACCESS_KEY_ID),
+  region: 'us-east-1'
+});
+
 const logger = (req, res, next) => {
     next(); // Passing the request to the next handler in the stack.
-    console.log(`${currentTime()} - ${req.method}: ${req.url}` );
+    console.log(`${currentTime()} - ${req.method}: ${req.url}` )
 }
 
 const authenticator = (req, res, next) => {
@@ -60,6 +73,15 @@ slouch.db.create(USERS_DB).then(() => {
     views: {
       by_email: {
         map: function (doc) { emit(doc.email, doc.password); }.toString()
+      },
+      followers: {
+        map: function (doc) {
+          if( doc.following.length > 0 ) {
+            for(var i = 0; i < doc.following.length ; i++) {
+              emit( doc.following[i], doc._id );
+            }
+          }
+        }.toString()
       }
     }
   })
@@ -91,8 +113,7 @@ slouch.db.create(HORSES_DB).then(() => {
   })
 })
 
-app.use('/couchproxy', authenticator)
-app.use('/couchproxy', proxy(`http://${configGet(COUCH_HOST)}`, {
+app.use('/couchproxy', authenticator, proxy(`http://${configGet(COUCH_HOST)}`, {
   proxyReqOptDecorator: (proxyReqOpts, srcReq) => {
     const authString = 'Basic ' +
       Buffer.from(
@@ -107,8 +128,30 @@ app.use('/couchproxy', proxy(`http://${configGet(COUCH_HOST)}`, {
   }
 }))
 
-app.post('/users', bodyParser.json())
-app.post('/users', async (req, res) => {
+app.use('/users/updateDBNotification', authenticator)
+app.post('/users/updateDBNotification', bodyParser.json())
+app.post('/users/updateDBNotification', async (req, res) => {
+  const userID = res.locals.userID
+  const db = req.body.db
+  const pusherS = new PusherService()
+  const result = await slouch.db.viewArray(
+    USERS_DB,
+    USERS_DESIGN_DOC,
+    'followers',
+    { key: `"${userID}"`}
+  )
+  for (let followerResult of result.rows) {
+    const followerID = followerResult.id
+    const channelStatus = await pusherS.channelStatus(followerID)
+    const occupied = JSON.parse(channelStatus.body).occupied
+    if (occupied) {
+      pusherS.trigger(followerID, db)
+    }
+  }
+  return res.json({})
+})
+
+app.post('/users', bodyParser.json(), async (req, res) => {
   const email = req.body.email
   const password = req.body.password
   const result = await slouch.db.viewArray(USERS_DB, USERS_DESIGN_DOC, 'by_email', { key: `"${email}"`})
@@ -137,8 +180,7 @@ app.post('/users', async (req, res) => {
 })
 
 
-app.post('/users/login', bodyParser.json())
-app.post('/users/login', async (req, res) => {
+app.post('/users/login', bodyParser.json(), async (req, res) => {
   const email = req.body.email
   const password = req.body.password
   const result = await slouch.db.viewArray(
@@ -164,6 +206,20 @@ app.post('/users/login', async (req, res) => {
       token
     })
   }
+})
+
+const meta = multer({
+  storage: multerS3({
+    s3: s3,
+    bucket: 'equesteo-profile-photos',
+    key: function (req, file, cb) {
+      console.log(file);
+      cb(null, file.originalname); //use Date.now() for unique file keys
+    }
+  })
+});
+app.post('/users/profilePhoto', authenticator, meta.single('file'), (req, res, next) => {
+  return res.json({})
 })
 
 app.get('/users/search', async (req, res) => {
