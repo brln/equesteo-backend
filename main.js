@@ -114,7 +114,7 @@ slouch.db.create(HORSES_DB).then(() => {
 })
 
 app.use('/couchproxy', authenticator, proxy(`http://${configGet(COUCH_HOST)}`, {
-  proxyReqOptDecorator: (proxyReqOpts, srcReq) => {
+  proxyReqOptDecorator: async (proxyReqOpts, srcReq) => {
     const authString = 'Basic ' +
       Buffer.from(
         `${configGet(COUCH_USERNAME)}:${configGet(COUCH_PASSWORD)}`
@@ -168,6 +168,7 @@ app.post('/users', bodyParser.json(), async (req, res) => {
     lastName: null,
     aboutMe: null,
     profilePhotoID: null,
+    photosByID: {},
   })
   const token = jwt.sign(
     { id: newUser.id, email },
@@ -208,17 +209,45 @@ app.post('/users/login', bodyParser.json(), async (req, res) => {
   }
 })
 
-const meta = multer({
+const userMeta = multer({
   storage: multerS3({
     s3: s3,
     bucket: 'equesteo-profile-photos',
     key: function (req, file, cb) {
-      console.log(file);
-      cb(null, file.originalname); //use Date.now() for unique file keys
+      cb(null, file.originalname)
     }
   })
 });
-app.post('/users/profilePhoto', authenticator, meta.single('file'), (req, res, next) => {
+app.post('/users/profilePhoto', authenticator, userMeta.single('file'), (req, res, next) => {
+  return res.json({})
+})
+
+
+const horseMeta = multer({
+  storage: multerS3({
+    s3: s3,
+    bucket: 'equesteo-horse-photos-2',
+    key: function (req, file, cb) {
+      cb(null, file.originalname)
+    }
+  })
+});
+app.post('/users/horsePhoto', authenticator, horseMeta.single('file'), (req, res, next) => {
+  console.log('horse photo uploaded')
+  return res.json({})
+})
+
+const rideMeta = multer({
+  storage: multerS3({
+    s3: s3,
+    bucket: 'equesteo-ride-photos',
+    key: function (req, file, cb) {
+      cb(null, file.originalname)
+    }
+  })
+});
+app.post('/users/ridePhoto', authenticator, rideMeta.single('file'), (req, res, next) => {
+  console.log('ride photo uploaded')
   return res.json({})
 })
 
@@ -245,3 +274,9 @@ app.get('/users/search', async (req, res) => {
 app.listen(process.env.PORT || 8080, '0.0.0.0', function () {
   console.log('Example app listening on port 8080!');
 });
+
+async function sleep (seconds) {
+  return new Promise((resolve, reject) => {
+    setTimeout(() => { resolve() }, seconds * 1000)
+  })
+}

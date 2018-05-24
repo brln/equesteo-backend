@@ -24,5 +24,4 @@ export function configGet (envVar) {
     found = defaults[envVar]
   }
   return found
-
 }
