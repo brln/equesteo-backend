@@ -251,7 +251,7 @@ app.post('/users/ridePhoto', authenticator, rideMeta.single('file'), (req, res, 
   return res.json({})
 })
 
-app.get('/users/search', async (req, res) => {
+app.get('/users/search', authenticator, async (req, res) => {
   const query = req.query.q
   const result = await slouch.db.viewArray(USERS_DB, USERS_DESIGN_DOC, 'by_email')
   const emails = result.rows.map((r) => r.key)
@@ -275,8 +275,3 @@ app.listen(process.env.PORT || 8080, '0.0.0.0', function () {
   console.log('Example app listening on port 8080!');
 });
 
-async function sleep (seconds) {
-  return new Promise((resolve, reject) => {
-    setTimeout(() => { resolve() }, seconds * 1000)
-  })
-}
