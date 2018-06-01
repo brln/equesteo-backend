@@ -4,7 +4,8 @@
   "description": "",
   "main": "app.js",
   "scripts": {
-    "start": "cd frontend; react-scripts build; cd ..; node main.babel.js;",
+    "prestart": "cd frontend && react-scripts build",
+    "start": "node main.babel.js;",
     "debug": "node $NODE_DEBUG_OPTION main.babel.js"
   },
   "author": "",
