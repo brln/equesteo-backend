@@ -7,6 +7,10 @@ import proxy from 'express-http-proxy'
 import aws from 'aws-sdk'
 import multer from 'multer'
 import multerS3 from 'multer-s3'
+import path from 'path'
+import xml2js from 'xml2js'
+
+import { haversine } from './helpers'
 
 import {
   configGet,
@@ -56,6 +60,51 @@ const authenticator = (req, res, next) => {
 
 app.use(logger)
 app.use(express.static('static'))
+app.use("/gpxUploader", express.static(path.join(__dirname, 'frontend', 'build')))
+
+
+const upload = multer({ storage: multer.memoryStorage() })
+app.post("/gpxUploader", authenticator, upload.single('file'), (req, resp) => {
+   let fileBuffer = req.file.buffer
+   xml2js.parseString(fileBuffer, (err, res) => {
+     const points = res.gpx.trk[0].trkseg[0].trkpt
+     const parsedPoints = []
+     let distance = 0
+     let lastPoint = null
+     let startTime = null
+     let lastTime = null
+     for (let point of points) {
+       const timestamp = Date.parse(point.time[0])
+       if (!lastTime || timestamp > lastTime) {
+         lastTime = timestamp
+       }
+       const lat = parseFloat(point.$.lat)
+       const long = parseFloat(point.$.lon)
+       startTime = startTime ? startTime : timestamp
+       if (lastPoint) {
+         distance += haversine(lastPoint.lat, lastPoint.long, lat, long)
+       }
+       lastPoint = { lat, long }
+       parsedPoints.push({
+         latitude: lat,
+         longitude: long,
+         accuracy: null,
+         timestamp,
+       })
+     }
+     const ride = {
+       coverPhotoID: null,
+       elapsedTimeSecs: (lastTime - startTime) / 1000,
+       type: 'ride',
+       rideCoordinates: parsedPoints,
+       distance,
+       photosByID: {},
+       startTime,
+       userID: resp.locals.userID,
+     }
+     slouch.doc.create(RIDES_DB, ride)
+   })
+})
 
 const USERS_DB = 'users'
 const HORSES_DB = 'horses'
@@ -128,9 +177,7 @@ app.use('/couchproxy', authenticator, proxy(`http://${configGet(COUCH_HOST)}`, {
   }
 }))
 
-app.use('/users/updateDBNotification', authenticator)
-app.post('/users/updateDBNotification', bodyParser.json())
-app.post('/users/updateDBNotification', async (req, res) => {
+app.post('/users/updateDBNotification', authenticator, bodyParser.json(), async (req, res) => {
   const userID = res.locals.userID
   const db = req.body.db
   const pusherS = new PusherService()
