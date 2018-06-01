@@ -45,6 +45,7 @@ class App extends Component {
   render() {
     let show = (
       <div>
+        Equesteo!
         <div>
           <label>email: </label>
           <input type="text" onChange={this.changeEmail}/>

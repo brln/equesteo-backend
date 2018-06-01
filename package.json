@@ -4,7 +4,7 @@
   "description": "",
   "main": "app.js",
   "scripts": {
-    "start": "node main.babel.js",
+    "start": "cd frontend; react-scripts build; cd ..; node main.babel.js;",
     "debug": "node $NODE_DEBUG_OPTION main.babel.js"
   },
   "author": "",
@@ -20,6 +20,7 @@
     "express-http-proxy": "^1.2.0",
     "jsonwebtoken": "^8.2.1",
     "multer": "^1.3.0",
-    "multer-s3": "^2.7.0"
+    "multer-s3": "^2.7.0",
+    "react-scripts": "^1.1.4"
   }
 }
