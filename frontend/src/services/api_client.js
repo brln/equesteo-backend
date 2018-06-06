@@ -39,7 +39,7 @@ export default class ApiClient {
       body = body ? JSON.stringify(body) : undefined
     }
     const resp = await fetch(
-      process.env.REACT_APP_API_URL + endpoint,
+      endpoint,
       {
         body,
         headers: this.headers(isJSON),
