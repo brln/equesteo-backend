@@ -1,6 +1,3 @@
-const API_URL = 'http://localhost:8080'
-
-
 export default class ApiClient {
   DELETE = 'delete'
   GET = 'get'
@@ -42,7 +39,7 @@ export default class ApiClient {
       body = body ? JSON.stringify(body) : undefined
     }
     const resp = await fetch(
-      API_URL + endpoint,
+      process.env.REACT_APP_API_URL + endpoint,
       {
         body,
         headers: this.headers(isJSON),

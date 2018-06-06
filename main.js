@@ -104,6 +104,7 @@ app.post("/gpxUploader", authenticator, upload.single('file'), (req, resp) => {
      }
      slouch.doc.create(RIDES_DB, ride)
    })
+   return resp.json({})
 })
 
 const USERS_DB = 'users'
