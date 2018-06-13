@@ -10,7 +10,7 @@ import multerS3 from 'multer-s3'
 import path from 'path'
 import xml2js from 'xml2js'
 
-import { haversine } from './helpers'
+import { haversine, staticMap } from './helpers'
 
 import {
   configGet,
@@ -102,6 +102,7 @@ app.post("/gpxUploader", authenticator, upload.single('file'), (req, resp) => {
        startTime,
        userID: resp.locals.userID,
      }
+     ride.mapURL = staticMap(ride)
      slouch.doc.create(RIDES_DB, ride)
    })
    return resp.json({})
