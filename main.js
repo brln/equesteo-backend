@@ -1,13 +1,14 @@
-import express from 'express'
-import bodyParser from 'body-parser'
-import Slouch from 'couch-slouch'
-import bcrypt from 'bcryptjs'
-import jwt from 'jsonwebtoken'
-import proxy from 'express-http-proxy'
 import aws from 'aws-sdk'
+import bcrypt from 'bcryptjs'
+import bodyParser from 'body-parser'
+import express from 'express'
+import jwt from 'jsonwebtoken'
+import moment from 'moment'
 import multer from 'multer'
 import multerS3 from 'multer-s3'
 import path from 'path'
+import proxy from 'express-http-proxy'
+import Slouch from 'couch-slouch'
 import xml2js from 'xml2js'
 
 import { haversine, staticMap } from './helpers'
@@ -92,14 +93,24 @@ app.post("/gpxUploader", authenticator, upload.single('file'), (req, resp) => {
          timestamp,
        })
      }
+     const name = `${
+       distance.toFixed(2)
+     } mi ride on ${
+       moment(startTime).format('MMMM DD YYYY')
+     }`
+
+
+     const rideID = `${resp.locals.userID}_${(new Date).getTime().toString()}`
      const ride = {
+       _id: rideID,
        coverPhotoID: null,
-       elapsedTimeSecs: (lastTime - startTime) / 1000,
-       type: 'ride',
-       rideCoordinates: parsedPoints,
        distance,
+       elapsedTimeSecs: (lastTime - startTime) / 1000,
+       name,
+       rideCoordinates: parsedPoints,
        photosByID: {},
        startTime,
+       type: 'ride',
        userID: resp.locals.userID,
      }
      ride.mapURL = staticMap(ride)
