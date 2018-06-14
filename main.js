@@ -139,7 +139,7 @@ slouch.db.create(USERS_DB).then(() => {
       followers: {
         map: function (doc) {
           if( doc.following.length > 0 ) {
-            for(var i = 0; i < doc.following.length ; i++) {
+            for(let i = 0; i < doc.following.length ; i++) {
               emit( doc.following[i], doc._id );
             }
           }
@@ -155,7 +155,7 @@ slouch.db.create(RIDES_DB).then(() => {
     _id: RIDES_DESIGN_DOC,
     filters: {
       byUserIDs: function (doc, req) {
-        var userIDs = req.query.userIDs.split(',');
+        let userIDs = req.query.userIDs.split(',');
         return userIDs.indexOf(doc.userID) >= 0;
       }.toString()
     }
@@ -168,7 +168,7 @@ slouch.db.create(HORSES_DB).then(() => {
     _id: HORSES_DESIGN_DOC,
     filters: {
       byUserIDs: function (doc, req) {
-        var userIDs = req.query.userIDs.split(',');
+        let userIDs = req.query.userIDs.split(',');
         return userIDs.indexOf(doc.userID) >= 0;
       }.toString()
     }
@@ -176,6 +176,11 @@ slouch.db.create(HORSES_DB).then(() => {
 })
 
 app.use('/couchproxy', authenticator, proxy(`http://${configGet(COUCH_HOST)}`, {
+  limit: "50mb",
+  proxyReqBodyDecorator: function(bodyContent, srcReq) {
+    // console.log(bodyContent.toString())
+    return bodyContent
+  },
   proxyReqOptDecorator: async (proxyReqOpts, srcReq) => {
     const authString = 'Basic ' +
       Buffer.from(
