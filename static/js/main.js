@@ -126,13 +126,16 @@ $(document).on('ready', function () {
   $('#submit-email').on('click', function () {
     var email = $('#interest-email').val()
     var type = $('#type-button-clicked').val()
+    console.log(email)
+    console.log(type)
     $.ajax({
         url: "/inquiries",
-        type: "post",
-        data: {
+        type: "POST",
+        contentType: "application/json",
+        data: JSON.stringify({
           email: email,
           type: type
-        }
+        })
     });
   })
 });

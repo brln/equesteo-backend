@@ -122,10 +122,12 @@ app.post("/gpxUploader", authenticator, upload.single('file'), (req, resp) => {
 const USERS_DB = 'users'
 const HORSES_DB = 'horses'
 const RIDES_DB = 'rides'
+const INQUIRIES_DB = 'inquiries'
 
 const slouch = new Slouch(
   `http://${configGet(COUCH_USERNAME)}:${configGet(COUCH_PASSWORD)}@${configGet(COUCH_HOST)}`
 );
+slouch.db.create(INQUIRIES_DB)
 slouch.db.create(HORSES_DB)
 
 const USERS_DESIGN_DOC = '_design/users'
@@ -194,6 +196,15 @@ app.use('/couchproxy', authenticator, proxy(`http://${configGet(COUCH_HOST)}`, {
     next(err);
   }
 }))
+
+app.post('/inquiries', bodyParser.json(), async (req, res) => {
+  const email = req.body.email
+  const type = req.body.type
+  await slouch.doc.create(INQUIRIES_DB, {
+    email, type
+  })
+  return res.json({})
+})
 
 app.post('/users/updateDBNotification', authenticator, bodyParser.json(), async (req, res) => {
   const userID = res.locals.userID
