@@ -114,6 +114,7 @@ app.post("/gpxUploader", authenticator, upload.single('file'), (req, resp) => {
        userID: resp.locals.userID,
      }
      ride.mapURL = staticMap(ride)
+     console.log(ride.mapURL)
      slouch.doc.create(RIDES_DB, ride)
    })
    return resp.json({})

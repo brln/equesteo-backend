@@ -38,7 +38,7 @@ export function staticMap (ride) {
   }
   const pathStyle = 'color:0xff0000ff|weight:5'
 
-  const MAX_NUM_COORDS = 300 // Google static maps API limit of 8096 chars in URL
+  const MAX_NUM_COORDS = 250 // Google static maps API limit of 8096 chars in URL
   let nth = ride.rideCoordinates.length / MAX_NUM_COORDS
   nth = (nth < 1) ? 1 : Math.ceil(nth)
   let pathCoords = ''
