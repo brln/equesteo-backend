@@ -54,3 +54,16 @@ export function staticMap (ride) {
   const queryString = urlParams(queryStringParams)
   return ROOT_URL + queryString
 }
+
+export function pwResetCode () {
+  let text = "";
+  const possible = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  const codeLength = 8
+  for (let i = 1; i <= codeLength; i++) {
+    text += possible.charAt(Math.floor(Math.random() * possible.length));
+    if (i % 4 === 0 && i !== codeLength) {
+      text += ' '
+    }
+  }
+  return text;
+}

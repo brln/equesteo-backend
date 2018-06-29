@@ -3,15 +3,20 @@ import bcrypt from 'bcryptjs'
 import bodyParser from 'body-parser'
 import express from 'express'
 import jwt from 'jsonwebtoken'
-import moment from 'moment'
 import multer from 'multer'
 import multerS3 from 'multer-s3'
 import path from 'path'
-import proxy from 'express-http-proxy'
 import Slouch from 'couch-slouch'
-import xml2js from 'xml2js'
 
-import { haversine, staticMap } from './helpers'
+
+import { authenticator } from './auth'
+
+import { postRide } from './controllers/gpxUploader'
+import { couchProxy } from './controllers/couchProxy'
+
+import { createUsersDesignDoc, USERS_DB, USERS_DESIGN_DOC } from "./design_docs/users"
+import { createHorsesDesignDoc } from "./design_docs/horses"
+import { createRidesDesignDoc } from './design_docs/rides'
 
 import {
   configGet,
@@ -22,7 +27,8 @@ import {
   COUCH_USERNAME,
   TOP_SECRET_JWT_TOKEN
 } from "./config"
-import { currentTime } from './helpers'
+import { currentTime, pwResetCode } from './helpers'
+import EmailerService from './services/emailer'
 
 const app = express()
 const s3 = new aws.S3()
@@ -38,165 +44,22 @@ const logger = (req, res, next) => {
     console.log(`${currentTime()} - ${req.method}: ${req.url}` )
 }
 
-const authenticator = (req, res, next) => {
-  const authHeader = req.headers.authorization
-  if (authHeader) {
-    const token = req.headers.authorization.split('Bearer: ')[1]
-    let decoded = undefined
-    try {
-      decoded = jwt.verify(token, configGet(TOP_SECRET_JWT_TOKEN))
-    } catch (e) {}
-    if (!token || !decoded) {
-      return res.status(401).json({error: 'Invalid Authorization header'})
-    }
-    const email = decoded.email
-    const userID = decoded.id
-    res.locals.userID = userID
-    res.locals.userEmail = email
-    next()
-  } else {
-    return res.status(401).json({error: 'Authorization header required'})
-  }
-}
-
 app.use(logger)
 app.use(express.static('static'))
 app.use("/gpxUploader", express.static(path.join(__dirname, 'frontend', 'build')))
 
-
-const upload = multer({ storage: multer.memoryStorage() })
-app.post("/gpxUploader", authenticator, upload.single('file'), (req, resp) => {
-   let fileBuffer = req.file.buffer
-   xml2js.parseString(fileBuffer, (err, res) => {
-     const points = res.gpx.trk[0].trkseg[0].trkpt
-     const parsedPoints = []
-     let distance = 0
-     let lastPoint = null
-     let startTime = null
-     let lastTime = null
-     for (let point of points) {
-       const timestamp = Date.parse(point.time[0])
-       if (!lastTime || timestamp > lastTime) {
-         lastTime = timestamp
-       }
-       const lat = parseFloat(point.$.lat)
-       const long = parseFloat(point.$.lon)
-       startTime = startTime ? startTime : timestamp
-       if (lastPoint) {
-         distance += haversine(lastPoint.lat, lastPoint.long, lat, long)
-       }
-       lastPoint = { lat, long }
-       parsedPoints.push({
-         latitude: lat,
-         longitude: long,
-         accuracy: null,
-         timestamp,
-       })
-     }
-     const name = `${
-       distance.toFixed(2)
-     } mi ride on ${
-       moment(startTime).format('MMMM DD YYYY')
-     }`
-
-
-     const rideID = `${resp.locals.userID}_${(new Date).getTime().toString()}`
-     const ride = {
-       _id: rideID,
-       coverPhotoID: null,
-       distance,
-       elapsedTimeSecs: (lastTime - startTime) / 1000,
-       name,
-       rideCoordinates: parsedPoints,
-       photosByID: {},
-       startTime,
-       type: 'ride',
-       userID: resp.locals.userID,
-     }
-     ride.mapURL = staticMap(ride)
-     console.log(ride.mapURL)
-     slouch.doc.create(RIDES_DB, ride)
-   })
-   return resp.json({})
-})
-
-const USERS_DB = 'users'
-const HORSES_DB = 'horses'
-const RIDES_DB = 'rides'
 const INQUIRIES_DB = 'inquiries'
-
 const slouch = new Slouch(
   `http://${configGet(COUCH_USERNAME)}:${configGet(COUCH_PASSWORD)}@${configGet(COUCH_HOST)}`
 );
 slouch.db.create(INQUIRIES_DB)
-slouch.db.create(HORSES_DB)
+createUsersDesignDoc(slouch)
+createHorsesDesignDoc(slouch)
+createRidesDesignDoc(slouch)
 
-const USERS_DESIGN_DOC = '_design/users'
-slouch.db.create(USERS_DB).then(() => {
-  slouch.doc.createOrUpdate(USERS_DB, {
-    _id: USERS_DESIGN_DOC,
-    views: {
-      by_email: {
-        map: function (doc) { emit(doc.email, doc.password); }.toString()
-      },
-      followers: {
-        map: function (doc) {
-          if( doc.following.length > 0 ) {
-            for(let i = 0; i < doc.following.length ; i++) {
-              emit( doc.following[i], doc._id );
-            }
-          }
-        }.toString()
-      }
-    }
-  })
-})
-
-const RIDES_DESIGN_DOC = '_design/rides'
-slouch.db.create(RIDES_DB).then(() => {
-  slouch.doc.createOrUpdate(RIDES_DB, {
-    _id: RIDES_DESIGN_DOC,
-    filters: {
-      byUserIDs: function (doc, req) {
-        let userIDs = req.query.userIDs.split(',');
-        return userIDs.indexOf(doc.userID) >= 0;
-      }.toString()
-    }
-  })
-})
-
-const HORSES_DESIGN_DOC = '_design/horses'
-slouch.db.create(HORSES_DB).then(() => {
-  slouch.doc.createOrUpdate(HORSES_DB, {
-    _id: HORSES_DESIGN_DOC,
-    filters: {
-      byUserIDs: function (doc, req) {
-        let userIDs = req.query.userIDs.split(',');
-        return userIDs.indexOf(doc.userID) >= 0;
-      }.toString()
-    }
-  })
-})
-
-app.use('/couchproxy', authenticator, proxy(`http://${configGet(COUCH_HOST)}`, {
-  limit: "50mb",
-  proxyReqBodyDecorator: function(bodyContent, srcReq) {
-    // console.log(bodyContent.toString())
-    return bodyContent
-  },
-  proxyReqOptDecorator: async (proxyReqOpts, srcReq) => {
-    const authString = 'Basic ' +
-      Buffer.from(
-        `${configGet(COUCH_USERNAME)}:${configGet(COUCH_PASSWORD)}`
-      ).toString('base64')
-    proxyReqOpts.headers['Authorization'] = authString
-    return proxyReqOpts
-  },
-  proxyErrorHandler: function(err, res, next) {
-    console.log(err)
-    next(err);
-  }
-}))
+// Create endpoints
+postRide(app)
+couchProxy(app)
 
 app.post('/inquiries', bodyParser.json(), async (req, res) => {
   const email = req.body.email
@@ -284,6 +147,79 @@ app.post('/users/login', bodyParser.json(), async (req, res) => {
       token
     })
   }
+})
+
+app.post('/users/getPWCode', bodyParser.json(), async (req, res) => {
+  const email = req.body.email
+  const result = await slouch.db.viewArray(
+    USERS_DB,
+    USERS_DESIGN_DOC,
+    'by_email',
+    { key: `"${email}"`, include_docs: true}
+  )
+  const found = result.rows
+  if (found.length === 1) {
+    const code = pwResetCode()
+    const noWhitespace = code.replace(/\s+/g, '')
+    const doc = found[0].doc
+    const newDoc = Object.assign({}, doc, { pwResetCode: noWhitespace })
+    await slouch.doc.update(USERS_DB, newDoc)
+
+    const emailer = new EmailerService()
+    emailer.sendCode(email, code)
+  }
+  return res.json({})
+})
+
+
+app.post('/users/exchangePWCode', bodyParser.json(), async (req, res) => {
+  const email = req.body.email
+  const code = req.body.code.replace(/\s+/g, '')
+  const result = await slouch.db.viewArray(
+    USERS_DB,
+    USERS_DESIGN_DOC,
+    'by_email',
+    { key: `"${email}"`, include_docs: true}
+  )
+  const found = result.rows
+  const doc = found[0].doc
+  if (found.length < 1 || code !== doc.pwResetCode) {
+    return res.status(401).json({'error': 'Wrong email/code.'})
+  } else if (found.length === 1) {
+    const token = jwt.sign(
+      {
+        id: found[0].id,
+        email,
+      },
+      configGet(TOP_SECRET_JWT_TOKEN)
+    );
+
+    const newDoc = Object.assign({}, doc, { pwResetCode: null })
+    await slouch.doc.update(USERS_DB, newDoc)
+    return res.json({
+      id: found[0].id,
+      following: found[0].doc.following,
+      token
+    })
+  }
+})
+
+app.post('/users/changePW', authenticator, bodyParser.json(), async (req, res) => {
+  const email = res.locals.userEmail
+  const password = req.body.password
+  const hashed = bcrypt.hashSync(password, bcrypt.genSaltSync(10));
+
+  const result = await slouch.db.viewArray(
+    USERS_DB,
+    USERS_DESIGN_DOC,
+    'by_email',
+    { key: `"${email}"`, include_docs: true}
+  )
+  const found = result.rows
+  const doc = found[0].doc
+  const newDoc = Object.assign({}, doc, { password: hashed })
+  await slouch.doc.update(USERS_DB, newDoc)
+  return res.json({})
 })
 
 const userMeta = multer({

@@ -1,5 +1,5 @@
-import PusherService from './pusher'
+import EmailerService from './emailer'
 
 export {
-  PusherService,
+  EmailerService,
 }
