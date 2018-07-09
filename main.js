@@ -16,7 +16,7 @@ import { couchProxy } from './controllers/couchProxy'
 
 import { createUsersDesignDoc, USERS_DB, USERS_DESIGN_DOC } from "./design_docs/users"
 import { createHorsesDesignDoc } from "./design_docs/horses"
-import { createRidesDesignDoc } from './design_docs/rides'
+import { createRidesDesignDoc, RIDES_DB } from './design_docs/rides'
 
 import {
   configGet,
@@ -222,10 +222,14 @@ app.post('/users/changePW', authenticator, bodyParser.json(), async (req, res) =
   return res.json({})
 })
 
+app.get('*.php', (req, res) => {
+  return res.json({fuck: 'you'})
+})
+
 const userMeta = multer({
   storage: multerS3({
     s3: s3,
-    bucket: 'equesteo-profile-photos',
+    bucket: 'equesteo-profile-photos-2',
     key: function (req, file, cb) {
       cb(null, file.originalname)
     }
@@ -239,7 +243,7 @@ app.post('/users/profilePhoto', authenticator, userMeta.single('file'), (req, re
 const horseMeta = multer({
   storage: multerS3({
     s3: s3,
-    bucket: 'equesteo-horse-photos-2',
+    bucket: 'equesteo-horse-photos',
     key: function (req, file, cb) {
       cb(null, file.originalname)
     }
@@ -253,7 +257,7 @@ app.post('/users/horsePhoto', authenticator, horseMeta.single('file'), (req, res
 const rideMeta = multer({
   storage: multerS3({
     s3: s3,
-    bucket: 'equesteo-ride-photos',
+    bucket: 'equesteo-ride-photos-2',
     key: function (req, file, cb) {
       cb(null, file.originalname)
     }
