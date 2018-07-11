@@ -7,6 +7,7 @@ import multer from 'multer'
 import multerS3 from 'multer-s3'
 import path from 'path'
 import Slouch from 'couch-slouch'
+import elasticsearch from 'elasticsearch'
 
 
 import { authenticator } from './auth'
@@ -25,6 +26,7 @@ import {
   COUCH_HOST,
   COUCH_PASSWORD,
   COUCH_USERNAME,
+  ELASTICSEARCH_HOST,
   TOP_SECRET_JWT_TOKEN
 } from "./config"
 import { currentTime, pwResetCode } from './helpers'
@@ -60,6 +62,47 @@ createRidesDesignDoc(slouch)
 // Create endpoints
 postRide(app)
 couchProxy(app)
+
+startChangesFeed()
+
+const ESClient = new elasticsearch.Client({
+  host: configGet(ELASTICSEARCH_HOST),
+})
+
+function startChangesFeed () {
+  // @TODO: this is going to have to change when there are
+  // a ton of changes, or it will be loading them all every
+  // time the backend boots.
+  let iterator = slouch.db.changes('users', {
+    include_docs: true,
+    feed: 'continuous',
+    heartbeat: true,
+  })
+
+  iterator.each(async (item) => {
+    if (item.doc && item.doc.email) {
+      await ESClient.update({
+        index: 'users',
+        type: 'users',
+        body: {
+          doc: {
+            email: item.doc.email,
+            firstName: item.doc.firstName,
+            lastName: item.doc.lastName,
+            profilePhotoID: item.doc.profilePhotoID,
+            photosByID: item.doc.photosByID,
+            aboutMe: item.doc.aboutMe,
+            following: item.doc.following,
+          },
+        doc_as_upsert: true,
+        },
+        id: item.doc._id,
+
+      })
+    }
+    return Promise.resolve()
+  })
+}
 
 app.post('/inquiries', bodyParser.json(), async (req, res) => {
   const email = req.body.email
@@ -270,22 +313,19 @@ app.post('/users/ridePhoto', authenticator, rideMeta.single('file'), (req, res, 
 
 app.get('/users/search', authenticator, async (req, res) => {
   const query = req.query.q
-  const result = await slouch.db.viewArray(USERS_DB, USERS_DESIGN_DOC, 'by_email')
-  const emails = result.rows.map((r) => r.key)
-  const matches = emails.filter((e) => e.includes(query))
-  const ids = result.rows.filter((r) => matches.indexOf(r.key) >= 0).map((r) => r.id)
-  const full_records = await slouch.doc.allArray(USERS_DB, {keys: JSON.stringify(ids), include_docs: true})
-  return res.json(full_records.rows.map((r) => {
-    return {
-      _id: r.doc._id,
-      email: r.doc.email,
-      following: r.doc.following,
-      firstName: r.doc.firstName,
-      lastName: r.doc.lastName,
-      aboutMe: r.doc.aboutMe,
-      profilePhotoID: r.doc.profilePhotoID,
-    }
-  }))
+  const qResp = await ESClient.search({
+    index: 'users',
+    q: query
+  })
+  const docs = []
+  for (let hit of qResp.hits.hits) {
+    const doc = Object.assign({}, hit._source)
+    doc._id = hit._id
+    delete doc.email
+    docs.push(doc)
+  }
+  console.log(docs)
+  return res.json(docs)
 })
 
 app.listen(process.env.PORT || 8080, '0.0.0.0', function () {
