@@ -92,7 +92,6 @@ function startChangesFeed () {
             profilePhotoID: item.doc.profilePhotoID,
             photosByID: item.doc.photosByID,
             aboutMe: item.doc.aboutMe,
-            following: item.doc.following,
           },
         doc_as_upsert: true,
         },
@@ -113,27 +112,6 @@ app.post('/inquiries', bodyParser.json(), async (req, res) => {
   return res.json({})
 })
 
-app.post('/users/updateDBNotification', authenticator, bodyParser.json(), async (req, res) => {
-  const userID = res.locals.userID
-  const db = req.body.db
-  const pusherS = new PusherService()
-  const result = await slouch.db.viewArray(
-    USERS_DB,
-    USERS_DESIGN_DOC,
-    'followers',
-    { key: `"${userID}"`}
-  )
-  for (let followerResult of result.rows) {
-    const followerID = followerResult.id
-    const channelStatus = await pusherS.channelStatus(followerID)
-    const occupied = JSON.parse(channelStatus.body).occupied
-    if (occupied) {
-      pusherS.trigger(followerID, db)
-    }
-  }
-  return res.json({})
-})
-
 app.post('/users', bodyParser.json(), async (req, res) => {
   const email = req.body.email
   const password = req.body.password
@@ -145,7 +123,6 @@ app.post('/users', bodyParser.json(), async (req, res) => {
   const hashed = bcrypt.hashSync(password, bcrypt.genSaltSync(10));
   const newUser = await slouch.doc.create(USERS_DB, {
     email,
-    following: [],
     password: hashed,
     firstName: null,
     lastName: null,
@@ -183,10 +160,24 @@ app.post('/users/login', bodyParser.json(), async (req, res) => {
         email,
       },
       configGet(TOP_SECRET_JWT_TOKEN)
-    );
+    )
+
+    const following = await slouch.db.viewArray(
+      USERS_DB,
+      USERS_DESIGN_DOC,
+      'following',
+      { key: `"${found[0].id}"`}
+    )
+    const followers = await slouch.db.viewArray(
+      USERS_DB,
+      USERS_DESIGN_DOC,
+      'followers',
+      { key: `"${found[0].id}"`}
+    )
     return res.json({
       id: found[0].id,
-      following: found[0].doc.following,
+      followers: followers.rows.map(f => f.value),
+      following: following.rows.map(f => f.value),
       token
     })
   }
@@ -236,12 +227,19 @@ app.post('/users/exchangePWCode', bodyParser.json(), async (req, res) => {
       },
       configGet(TOP_SECRET_JWT_TOKEN)
     );
+    //@TODO do followers like login
+    const following = await slouch.db.viewArray(
+      USERS_DB,
+      USERS_DESIGN_DOC,
+      'following',
+      { key: `"${found[0].id}"`}
+    )
 
     const newDoc = Object.assign({}, doc, { pwResetCode: null })
     await slouch.doc.update(USERS_DB, newDoc)
     return res.json({
       id: found[0].id,
-      following: found[0].doc.following,
+      following:  following.rows.map(f => f.value),
       token
     })
   }

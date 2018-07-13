@@ -9,15 +9,30 @@ export function createUsersDesignDoc (slouch) {
         by_email: {
           map: function (doc) { emit(doc.email, doc.password); }.toString()
         },
+        following: {
+          map: function (doc) {
+            if( doc.type === 'follow') {
+              emit( doc.followerID, doc.followingID );
+            }
+          }.toString()
+        },
         followers: {
           map: function (doc) {
-            if( doc.following.length > 0 ) {
-              for(let i = 0; i < doc.following.length ; i++) {
-                emit( doc.following[i], doc._id );
-              }
+            if( doc.type === 'follow') {
+              emit( doc.followingID, doc.followerID );
             }
           }.toString()
         }
+      },
+      filters: {
+        byUserIDs: function (doc, req) {
+          let userIDs = req.query.userIDs.split(',');
+          if (userIDs.indexOf(doc._id) >= 0
+              || userIDs.indexOf(doc.followingID) >= 0
+              || userIDs.indexOf(doc.followerID) >= 0) {
+            return true
+          }
+        }.toString()
       }
     })
   })
