@@ -129,6 +129,7 @@ app.post('/users', bodyParser.json(), async (req, res) => {
     aboutMe: null,
     profilePhotoID: null,
     photosByID: {},
+    type: 'user',
   })
   const token = jwt.sign(
     { id: newUser.id, email },

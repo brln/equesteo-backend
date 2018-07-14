@@ -28,8 +28,9 @@ export function createUsersDesignDoc (slouch) {
         byUserIDs: function (doc, req) {
           let userIDs = req.query.userIDs.split(',');
           if (userIDs.indexOf(doc._id) >= 0
-              || userIDs.indexOf(doc.followingID) >= 0
-              || userIDs.indexOf(doc.followerID) >= 0) {
+              || (doc.type === 'follow' && userIDs.indexOf(doc.followingID) >= 0)
+              || (doc.type === 'follow' && userIDs.indexOf(doc.followerID) >= 0))
+          {
             return true
           }
         }.toString()
