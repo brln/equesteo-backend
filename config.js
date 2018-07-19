@@ -4,6 +4,7 @@ export const COUCH_HOST = 'COUCH_HOST'
 export const COUCH_PASSWORD = 'COUCH_PASSWORD'
 export const COUCH_USERNAME = 'COUCH_USERNAME'
 export const ELASTICSEARCH_HOST = 'ELASTICSEARCH_HOST'
+export const GCM_API_KEY = 'GCM_API_KEY'
 export const SENDGRID_API_TOKEN = 'SENDGRID_API_TOKEN'
 export const TOP_SECRET_JWT_TOKEN = 'TOP_SECRET_JWT_TOKEN'
 
@@ -14,6 +15,7 @@ const defaults = {
   COUCH_PASSWORD: 'equesteo',
   COUCH_USERNAME: 'equesteo',
   ELASTICSEARCH_HOST: 'localhost:9200',
+  GCM_API_KEY: 'summtin',
   PUSHER_KEY: 'dope',
   PUSHER_SECRET: 'fiend',
   SENDGRID_API_TOKEN: 'something,',

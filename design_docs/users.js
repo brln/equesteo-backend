@@ -19,7 +19,7 @@ export function createUsersDesignDoc (slouch) {
         followers: {
           map: function (doc) {
             if( doc.type === 'follow') {
-              emit( doc.followingID, doc.followerID );
+              emit( doc.followingID, {_id: doc.followerID} );
             }
           }.toString()
         }

@@ -2,6 +2,7 @@ import aws from 'aws-sdk'
 import bcrypt from 'bcryptjs'
 import bodyParser from 'body-parser'
 import express from 'express'
+import gcm from 'node-gcm'
 import jwt from 'jsonwebtoken'
 import multer from 'multer'
 import multerS3 from 'multer-s3'
@@ -17,7 +18,7 @@ import { couchProxy } from './controllers/couchProxy'
 
 import { createUsersDesignDoc, USERS_DB, USERS_DESIGN_DOC } from "./design_docs/users"
 import { createHorsesDesignDoc } from "./design_docs/horses"
-import { createRidesDesignDoc, RIDES_DB } from './design_docs/rides'
+import { createRidesDesignDoc } from './design_docs/rides'
 
 import {
   configGet,
@@ -27,6 +28,7 @@ import {
   COUCH_PASSWORD,
   COUCH_USERNAME,
   ELASTICSEARCH_HOST,
+  GCM_API_KEY,
   TOP_SECRET_JWT_TOKEN
 } from "./config"
 import { currentTime, pwResetCode } from './helpers'
@@ -63,13 +65,67 @@ createRidesDesignDoc(slouch)
 postRide(app)
 couchProxy(app)
 
-startChangesFeed()
+startChangesFeedForElastic()
+startChangesFeedForPush()
 
 const ESClient = new elasticsearch.Client({
   host: configGet(ELASTICSEARCH_HOST),
 })
 
-function startChangesFeed () {
+const sender = new gcm.Sender(configGet(GCM_API_KEY));
+
+function startChangesFeedForPush() {
+  let iterator = slouch.db.changes('rides', {
+    include_docs: true,
+    feed: 'continuous',
+    heartbeat: true,
+    since: 'now'
+  })
+
+  iterator.each(async (item) => {
+    if (item.doc && item.doc.type === 'ride') {
+      const userID = item.doc.userID
+      if (!userID) throw Error('wut why not')
+      const followers = await slouch.db.viewArray(
+        USERS_DB,
+        USERS_DESIGN_DOC,
+        'followers',
+        { key: `"${userID}"`, include_docs: true }
+      )
+
+      const user = await slouch.doc.get(USERS_DB, item.doc.userID)
+      console.log(user)
+
+      const followerFCMTokens = []
+      followers.rows.reduce((r, e) => {
+        if (e.doc.fcmToken) r.push(e.doc.fcmToken)
+      }, followerFCMTokens)
+
+      const message = new gcm.Message({
+        data: {
+          rideID: item.doc._id,
+          userID: item.doc.userID,
+          userName: `${user.firstName} ${user.lastName}`,
+          distance: item.doc.distance,
+        }
+      });
+      try{
+        sender.send(
+          message,
+          { registrationTokens: followerFCMTokens },
+          (err, response) => {
+            if (err) console.error(err);
+            else console.log(response);
+          }
+        );
+      } catch (e) {
+        console.log(e)
+      }
+    }
+  })
+}
+
+function startChangesFeedForElastic () {
   // @TODO: this is going to have to change when there are
   // a ton of changes, or it will be loading them all every
   // time the backend boots.
@@ -326,6 +382,26 @@ app.get('/users/search', authenticator, async (req, res) => {
   console.log(docs)
   return res.json(docs)
 })
+
+function sendPush () {
+  const sender = new gcm.Sender(configGet(GCM_API_KEY));
+  const message = new gcm.Message({
+      data: { key1: 'msg1' }
+  });
+  var regTokens = ['ct438asW2wY:APA91bFNtVczd5VV3P4mKvbiUEI2ByadBl4FpCj1D3z6YTPHkzMLNrdZgChE9_WcLnWSJONt-FWYcxVZAYwvc3WDh6bfSuk3MSNMUb0m41YzrpVGRMrR3f6TliklGz1kAoi8JvGXGTaE7VFkw5k74vT8qYoRQzge4Q'];
+  sender.send(message, { registrationTokens: regTokens }, function (err, response) {
+    if (err) console.error(err);
+    else console.log(response);
+  });
+}
+sendPush()
+
+
+
+
+
+
+
 
 app.listen(process.env.PORT || 8080, '0.0.0.0', function () {
   console.log('Example app listening on port 8080!');
