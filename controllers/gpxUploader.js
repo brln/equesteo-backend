@@ -1,10 +1,22 @@
 import multer from 'multer'
 import moment from 'moment'
+import Slouch from 'couch-slouch'
 import xml2js from 'xml2js'
 
 import { authenticator } from '../auth'
 import { haversine, staticMap } from '../helpers'
 import { RIDES_DB } from '../design_docs/rides'
+import {
+  configGet,
+  COUCH_HOST,
+  COUCH_PASSWORD,
+  COUCH_USERNAME,
+} from "../config"
+
+
+const slouch = new Slouch(
+  `http://${configGet(COUCH_USERNAME)}:${configGet(COUCH_PASSWORD)}@${configGet(COUCH_HOST)}`
+);
 
 export function postRide (app) {
   const upload = multer({ storage: multer.memoryStorage() })

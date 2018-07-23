@@ -12,14 +12,6 @@ import elasticsearch from 'elasticsearch'
 
 
 import { authenticator } from './auth'
-
-import { postRide } from './controllers/gpxUploader'
-import { couchProxy } from './controllers/couchProxy'
-
-import { createUsersDesignDoc, USERS_DB, USERS_DESIGN_DOC } from "./design_docs/users"
-import { createHorsesDesignDoc } from "./design_docs/horses"
-import { createRidesDesignDoc } from './design_docs/rides'
-
 import {
   configGet,
   AWS_ACCESS_KEY_ID,
@@ -31,7 +23,12 @@ import {
   GCM_API_KEY,
   TOP_SECRET_JWT_TOKEN
 } from "./config"
-import { currentTime, pwResetCode } from './helpers'
+import { currentTime, pwResetCode, unixTimeNow } from './helpers'
+import { postRide } from './controllers/gpxUploader'
+import { couchProxy } from './controllers/couchProxy'
+import { createUsersDesignDoc, USERS_DB, USERS_DESIGN_DOC } from "./design_docs/users"
+import { createHorsesDesignDoc } from "./design_docs/horses"
+import { createRidesDesignDoc } from './design_docs/rides'
 import EmailerService from './services/emailer'
 
 const app = express()
@@ -83,7 +80,8 @@ function startChangesFeedForPush() {
   })
 
   iterator.each(async (item) => {
-    if (item.doc && item.doc.type === 'ride') {
+    if (item.doc && item.doc.type === 'ride' && item.doc._rev.split('-')[0] === '1') {
+      console.log(item.doc)
       const userID = item.doc.userID
       if (!userID) throw Error('wut why not')
       const followers = await slouch.db.viewArray(
@@ -94,8 +92,6 @@ function startChangesFeedForPush() {
       )
 
       const user = await slouch.doc.get(USERS_DB, item.doc.userID)
-      console.log(user)
-
       const followerFCMTokens = []
       followers.rows.reduce((r, e) => {
         if (e.doc.fcmToken) r.push(e.doc.fcmToken)
@@ -136,7 +132,8 @@ function startChangesFeedForElastic () {
   })
 
   iterator.each(async (item) => {
-    if (item.doc && item.doc.email) {
+    if (item.doc && item.doc.type === 'user') {
+      console.log('updating elasticsearch record: ' + item.doc._id)
       await ESClient.update({
         index: 'users',
         type: 'users',
@@ -154,6 +151,16 @@ function startChangesFeedForElastic () {
         id: item.doc._id,
 
       })
+    }
+    if (item.deleted) {
+      try {
+        await ESClient.delete({
+          index: 'users',
+          type: 'users',
+          id: item.doc._id
+        })
+        console.log('deleting elasticsearch record: ' + item.doc._id)
+      } catch (e) {}
     }
     return Promise.resolve()
   })
@@ -186,6 +193,7 @@ app.post('/users', bodyParser.json(), async (req, res) => {
     profilePhotoID: null,
     photosByID: {},
     type: 'user',
+    createTime: unixTimeNow()
   })
   const token = jwt.sign(
     { id: newUser.id, email },
@@ -382,26 +390,6 @@ app.get('/users/search', authenticator, async (req, res) => {
   console.log(docs)
   return res.json(docs)
 })
-
-function sendPush () {
-  const sender = new gcm.Sender(configGet(GCM_API_KEY));
-  const message = new gcm.Message({
-      data: { key1: 'msg1' }
-  });
-  var regTokens = ['ct438asW2wY:APA91bFNtVczd5VV3P4mKvbiUEI2ByadBl4FpCj1D3z6YTPHkzMLNrdZgChE9_WcLnWSJONt-FWYcxVZAYwvc3WDh6bfSuk3MSNMUb0m41YzrpVGRMrR3f6TliklGz1kAoi8JvGXGTaE7VFkw5k74vT8qYoRQzge4Q'];
-  sender.send(message, { registrationTokens: regTokens }, function (err, response) {
-    if (err) console.error(err);
-    else console.log(response);
-  });
-}
-sendPush()
-
-
-
-
-
-
-
 
 app.listen(process.env.PORT || 8080, '0.0.0.0', function () {
   console.log('Example app listening on port 8080!');

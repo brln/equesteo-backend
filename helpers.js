@@ -67,3 +67,7 @@ export function pwResetCode () {
   }
   return text;
 }
+
+export const unixTimeNow = () => {
+  return Math.floor(new Date().getTime())
+}
