@@ -28,21 +28,20 @@ function urlParams (params) {
 }
 
 export function staticMap (ride) {
-  console.log('static map')
-  const STATIC_MAPS_API_KEY = 'AIzaSyBhUmpq-7uQ2JaqtrHO3hpfeFHynVpo8xQ'
   const ROOT_URL = 'https://maps.googleapis.com/maps/api/staticmap?'
   const queryStringParams = {
-    size: '580x350',
+    size: '800x450',
     format: 'png',
     maptype: 'terrain',
   }
   const pathStyle = 'color:0xff0000ff|weight:5'
 
   const MAX_NUM_COORDS = 250 // Google static maps API limit of 8096 chars in URL
-  let nth = ride.rideCoordinates.length / MAX_NUM_COORDS
+  const numCoords = ride.rideCoordinates.length
+  let nth = numCoords / MAX_NUM_COORDS
   nth = (nth < 1) ? 1 : Math.ceil(nth)
   let pathCoords = ''
-  for (let i = 0; i < ride.rideCoordinates.length; i++) {
+  for (let i = 0; i < numCoords; i++) {
     const coordinate = ride.rideCoordinates[i]
     if (i % nth === 0) {
       pathCoords += `|${coordinate.latitude},${coordinate.longitude}`
@@ -50,7 +49,6 @@ export function staticMap (ride) {
   }
 
   queryStringParams['path'] = pathStyle + pathCoords
-  queryStringParams['key'] = STATIC_MAPS_API_KEY
   const queryString = urlParams(queryStringParams)
   return ROOT_URL + queryString
 }
@@ -66,6 +64,25 @@ export function pwResetCode () {
     }
   }
   return text;
+}
+
+export function newRideName (currentRide) {
+  let name
+  const hour = (new Date(currentRide.startTime)).getHours()
+  if (hour < 5) {
+    name = 'Early Morning Ride'
+  } else if (hour < 10) {
+    name = 'Morning Ride'
+  } else if (hour < 14) {
+    name = 'Lunch Ride'
+  } else if (hour < 17) {
+    name = 'Afternoon Ride'
+  } else if (hour < 20) {
+    name = 'Evening Ride'
+  } else if (hour < 25 ) {
+    name = 'Night Ride'
+  }
+  return name
 }
 
 export const unixTimeNow = () => {

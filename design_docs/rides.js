@@ -9,8 +9,7 @@ export function createRidesDesignDoc (slouch) {
         byUserIDs: function (doc, req) {
           let userIDs = req.query.userIDs.split(',');
           let followerIDs = req.query.followerUserIDs.split(',');
-          return userIDs.indexOf(doc.userID) >= 0
-            || (doc.type === 'comment' && followerIDs.indexOf(doc.userID) >= 0);
+          return userIDs.indexOf(doc.userID) >= 0 || (doc.type === 'comment' && followerIDs.indexOf(doc.userID) >= 0);
         }.toString()
       }
     })

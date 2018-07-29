@@ -1,10 +1,9 @@
 import multer from 'multer'
-import moment from 'moment'
 import Slouch from 'couch-slouch'
 import xml2js from 'xml2js'
 
 import { authenticator } from '../auth'
-import { haversine, staticMap } from '../helpers'
+import { haversine, newRideName, staticMap } from '../helpers'
 import { RIDES_DB } from '../design_docs/rides'
 import {
   configGet,
@@ -48,12 +47,6 @@ export function postRide (app) {
           timestamp,
         })
       }
-      const name = `${
-        distance.toFixed(2)
-        } mi ride on ${
-        moment(startTime).format('MMMM DD YYYY')
-        }`
-
 
       const rideID = `${resp.locals.userID}_${(new Date).getTime().toString()}`
       const ride = {
@@ -61,15 +54,15 @@ export function postRide (app) {
         coverPhotoID: null,
         distance,
         elapsedTimeSecs: (lastTime - startTime) / 1000,
-        name,
         rideCoordinates: parsedPoints,
         photosByID: {},
         startTime,
         type: 'ride',
         userID: resp.locals.userID,
+        isPublic: true,
       }
+      ride.name = newRideName(ride)
       ride.mapURL = staticMap(ride)
-      console.log(ride.mapURL)
       slouch.doc.create(RIDES_DB, ride)
     })
     return resp.json({})

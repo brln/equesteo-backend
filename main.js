@@ -80,7 +80,7 @@ function startChangesFeedForPush() {
   })
 
   iterator.each(async (item) => {
-    if (item.doc && item.doc.type === 'ride' && item.doc._rev.split('-')[0] === '1') {
+    if (item.doc && item.doc.type === 'ride' && item.doc._rev.split('-')[0] === '1' && item.doc.isPublic === true) {
       console.log(item.doc)
       const userID = item.doc.userID
       if (!userID) throw Error('wut why not')
@@ -192,6 +192,7 @@ app.post('/users', bodyParser.json(), async (req, res) => {
     aboutMe: null,
     profilePhotoID: null,
     photosByID: {},
+    ridesDefaultPublic: true,
     type: 'user',
     createTime: unixTimeNow()
   })
