@@ -208,6 +208,7 @@ app.post('/users', bodyParser.json(), async (req, res) => {
 
 
 app.post('/users/login', bodyParser.json(), async (req, res) => {
+  console.log('user logging in')
   const email = req.body.email
   const password = req.body.password
   const result = await slouch.db.viewArray(
