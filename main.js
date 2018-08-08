@@ -95,6 +95,7 @@ function startChangesFeedForPush() {
       const followerFCMTokens = []
       followers.rows.reduce((r, e) => {
         if (e.doc.fcmToken) r.push(e.doc.fcmToken)
+        return r
       }, followerFCMTokens)
 
       const message = new gcm.Message({
@@ -283,10 +284,10 @@ app.post('/users/exchangePWCode', bodyParser.json(), async (req, res) => {
     { key: `"${email}"`, include_docs: true}
   )
   const found = result.rows
-  const doc = found[0].doc
-  if (found.length < 1 || code !== doc.pwResetCode) {
+  if (found.length < 1 || code !== found[0].doc.pwResetCode) {
     return res.status(401).json({'error': 'Wrong email/code.'})
   } else if (found.length === 1) {
+    const doc = found[0].doc
     const token = jwt.sign(
       {
         id: found[0].id,
@@ -294,11 +295,16 @@ app.post('/users/exchangePWCode', bodyParser.json(), async (req, res) => {
       },
       configGet(TOP_SECRET_JWT_TOKEN)
     );
-    //@TODO do followers like login
     const following = await slouch.db.viewArray(
       USERS_DB,
       USERS_DESIGN_DOC,
       'following',
+      { key: `"${found[0].id}"`}
+    )
+    const followers = await slouch.db.viewArray(
+      USERS_DB,
+      USERS_DESIGN_DOC,
+      'followers',
       { key: `"${found[0].id}"`}
     )
 
@@ -307,6 +313,7 @@ app.post('/users/exchangePWCode', bodyParser.json(), async (req, res) => {
     return res.json({
       id: found[0].id,
       following:  following.rows.map(f => f.value),
+      followers: followers.rows.map(f => f.value),
       token
     })
   }
