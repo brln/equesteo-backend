@@ -26,13 +26,7 @@ export function createUsersDesignDoc (slouch) {
       },
       filters: {
         byUserIDs: function (doc, req) {
-          let userIDs = req.query.userIDs.split(',');
-          if (userIDs.indexOf(doc._id) >= 0
-              || (doc.type === 'follow' && userIDs.indexOf(doc.followingID) >= 0)
-              || (doc.type === 'follow' && userIDs.indexOf(doc.followerID) >= 0))
-          {
-            return true
-          }
+          return true
         }.toString()
       }
     })

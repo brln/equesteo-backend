@@ -90,6 +90,7 @@ function startChangesFeedForPush() {
         'followers',
         { key: `"${userID}"`, include_docs: true }
       )
+      console.log(followers)
 
       const user = await slouch.doc.get(USERS_DB, item.doc.userID)
       const followerFCMTokens = []
@@ -185,6 +186,7 @@ app.post('/users', bodyParser.json(), async (req, res) => {
     return res.status(400).json({'error': 'User already exists'})
   }
   const hashed = bcrypt.hashSync(password, bcrypt.genSaltSync(10));
+  // @TODO: 'split this into public and private records'
   const newUser = await slouch.doc.create(USERS_DB, {
     email,
     password: hashed,

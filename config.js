@@ -11,7 +11,7 @@ export const TOP_SECRET_JWT_TOKEN = 'TOP_SECRET_JWT_TOKEN'
 const defaults = {
   AWS_SECRET_ACCESS_KEY: 'asdf',
   AWS_ACCESS_KEY_ID: 'qwer',
-  COUCH_HOST: 'localhost:15984',
+  COUCH_HOST: 'localhost:5984',
   COUCH_PASSWORD: 'equesteo',
   COUCH_USERNAME: 'equesteo',
   ELASTICSEARCH_HOST: 'localhost:9200',
