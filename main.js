@@ -80,8 +80,9 @@ function startChangesFeedForPush() {
   })
 
   iterator.each(async (item) => {
-    if (item.doc && item.doc.type === 'ride' && item.doc._rev.split('-')[0] === '1' && item.doc.isPublic === true) {
-      console.log(item.doc)
+    if (item.doc && item.doc.type === 'ride'
+      && item.doc._rev.split('-')[0] === '1'
+      && item.doc.isPublic === true) {
       const userID = item.doc.userID
       if (!userID) throw Error('wut why not')
       const followers = await slouch.db.viewArray(
@@ -90,12 +91,12 @@ function startChangesFeedForPush() {
         'followers',
         { key: `"${userID}"`, include_docs: true }
       )
-      console.log(followers)
 
       const user = await slouch.doc.get(USERS_DB, item.doc.userID)
       const followerFCMTokens = []
       followers.rows.reduce((r, e) => {
         if (e.doc.fcmToken) r.push(e.doc.fcmToken)
+        console.log(e.doc.email)
         return r
       }, followerFCMTokens)
 
@@ -250,6 +251,8 @@ app.post('/users/login', bodyParser.json(), async (req, res) => {
       following: following.rows.map(f => f.value),
       token
     })
+  } else if (found.length > 1) {
+    throw Error('Multiple records with one email found!')
   }
 })
 
