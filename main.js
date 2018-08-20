@@ -80,8 +80,9 @@ function startChangesFeedForPush() {
   })
 
   iterator.each(async (item) => {
-    if (item.doc && item.doc.type === 'ride' && item.doc._rev.split('-')[0] === '1' && item.doc.isPublic === true) {
-      console.log(item.doc)
+    if (item.doc && item.doc.type === 'ride'
+      && item.doc._rev.split('-')[0] === '1'
+      && item.doc.isPublic === true) {
       const userID = item.doc.userID
       if (!userID) throw Error('wut why not')
       const followers = await slouch.db.viewArray(
@@ -95,6 +96,7 @@ function startChangesFeedForPush() {
       const followerFCMTokens = []
       followers.rows.reduce((r, e) => {
         if (e.doc.fcmToken) r.push(e.doc.fcmToken)
+        console.log(e.doc.email)
         return r
       }, followerFCMTokens)
 
@@ -185,6 +187,7 @@ app.post('/users', bodyParser.json(), async (req, res) => {
     return res.status(400).json({'error': 'User already exists'})
   }
   const hashed = bcrypt.hashSync(password, bcrypt.genSaltSync(10));
+  // @TODO: 'split this into public and private records'
   const newUser = await slouch.doc.create(USERS_DB, {
     email,
     password: hashed,
@@ -248,6 +251,8 @@ app.post('/users/login', bodyParser.json(), async (req, res) => {
       following: following.rows.map(f => f.value),
       token
     })
+  } else if (found.length > 1) {
+    throw Error('Multiple records with one email found!')
   }
 })
 
