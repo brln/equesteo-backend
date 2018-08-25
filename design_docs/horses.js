@@ -5,10 +5,19 @@ export function createHorsesDesignDoc (slouch) {
   slouch.db.create(HORSES_DB).then(() => {
     slouch.doc.createOrUpdate(HORSES_DB, {
       _id: HORSES_DESIGN_DOC,
+      views: {
+        allJoins: {
+          map: function (doc) {
+            if (doc.type === 'horseUser') {
+              emit(doc.userID, doc.horseID)
+            }
+          }.toString()
+        }
+      },
       filters: {
-        byUserIDs: function (doc, req) {
-          let userIDs = req.query.userIDs.split(',');
-          return userIDs.indexOf(doc.userID) >= 0;
+        byID: function (doc, req) {
+          let ids = req.query.ids.split(',');
+          return ids.indexOf(doc._id) >= 0;
         }.toString()
       }
     })
