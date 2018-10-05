@@ -165,37 +165,37 @@ function startChangesFeedForElastic () {
   })
 }
 
-app.get('/createUsersDB', async (req, res) => {
-  const tableName = 'equesteo_users'
-  try {
-    const ddbService = new DynamoDBService()
-    await ddbService.deleteTable(tableName)
-  } catch (e) {}
-
-  const ddbService = new DynamoDBService()
-  await ddbService.createTable('email', 'S', tableName)
-  return res.json({"all": "done"})
-})
-
-app.get('/migrateUsersData', async (req, res) => {
-  const tableName = 'equesteo_users'
-  const ddbService = new DynamoDBService()
-  slouch.doc.all(USERS_DB, {include_docs: true}).each(async (item) => {
-    if (item.doc.type === 'user') {
-      const newItem = {}
-      newItem.email = {S: item.doc.email}
-      newItem.password = {S: item.doc.password}
-      newItem.id = {S: item.doc._id}
-      if (item.doc.fcmToken) {
-        newItem.fcmToken = {S: item.doc.fcmToken}
-      }
-      await ddbService.putItem(tableName, newItem)
-      const resp = await ddbService.getItem(tableName, { email: {S: item.doc.email }})
-      console.log(resp)
-    }
-  })
-  return res.json({'done': "now"})
-})
+// app.get('/createUsersDB', async (req, res) => {
+//   const tableName = 'equesteo_users'
+//   try {
+//     const ddbService = new DynamoDBService()
+//     await ddbService.deleteTable(tableName)
+//   } catch (e) {}
+//
+//   const ddbService = new DynamoDBService()
+//   await ddbService.createTable('email', 'S', tableName)
+//   return res.json({"all": "done"})
+// })
+//
+// app.get('/migrateUsersData', async (req, res) => {
+//   const tableName = 'equesteo_users'
+//   const ddbService = new DynamoDBService()
+//   slouch.doc.all(USERS_DB, {include_docs: true}).each(async (item) => {
+//     if (item.doc.type === 'user') {
+//       const newItem = {}
+//       newItem.email = {S: item.doc.email}
+//       newItem.password = {S: item.doc.password}
+//       newItem.id = {S: item.doc._id}
+//       if (item.doc.fcmToken) {
+//         newItem.fcmToken = {S: item.doc.fcmToken}
+//       }
+//       await ddbService.putItem(tableName, newItem)
+//       const resp = await ddbService.getItem(tableName, { email: {S: item.doc.email }})
+//       console.log(resp)
+//     }
+//   })
+//   return res.json({'done': "now"})
+// })
 
 const userMeta = multer({
   storage: multerS3({
