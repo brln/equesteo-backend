@@ -7,7 +7,7 @@ export default class UserAPI {
   }
 
   async login (email, password) {
-    return await this.apiClient.post('/users/login', {
+    return await this.apiClient.post('/users/users', {
       email: email,
       password: password,
     })

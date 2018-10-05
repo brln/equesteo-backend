@@ -1,15 +1,11 @@
 import aws from 'aws-sdk'
-import bcrypt from 'bcryptjs'
-import bodyParser from 'body-parser'
 import express from 'express'
 import gcm from 'node-gcm'
-import jwt from 'jsonwebtoken'
 import multer from 'multer'
 import multerS3 from 'multer-s3'
 import path from 'path'
 import Slouch from 'couch-slouch'
 import elasticsearch from 'elasticsearch'
-
 
 import { authenticator } from './auth'
 import {
@@ -21,15 +17,15 @@ import {
   COUCH_USERNAME,
   ELASTICSEARCH_HOST,
   GCM_API_KEY,
-  TOP_SECRET_JWT_TOKEN
 } from "./config"
-import { currentTime, pwResetCode, unixTimeNow } from './helpers'
+import DynamoDBService from './services/dynamoDB'
+import { currentTime } from './helpers'
 import { postRide } from './controllers/gpxUploader'
 import { couchProxy } from './controllers/couchProxy'
+import { users } from './controllers/users'
 import { createUsersDesignDoc, USERS_DB, USERS_DESIGN_DOC } from "./design_docs/users"
 import { createHorsesDesignDoc } from "./design_docs/horses"
 import { createRidesDesignDoc } from './design_docs/rides'
-import EmailerService from './services/emailer'
 
 const app = express()
 const s3 = new aws.S3()
@@ -61,6 +57,7 @@ createRidesDesignDoc(slouch)
 // Create endpoints
 postRide(app)
 couchProxy(app)
+users(app)
 
 startChangesFeedForElastic()
 startChangesFeedForPush()
@@ -142,7 +139,6 @@ function startChangesFeedForElastic () {
         type: 'users',
         body: {
           doc: {
-            email: item.doc.email,
             firstName: item.doc.firstName,
             lastName: item.doc.lastName,
             profilePhotoID: item.doc.profilePhotoID,
@@ -169,181 +165,36 @@ function startChangesFeedForElastic () {
   })
 }
 
-app.post('/inquiries', bodyParser.json(), async (req, res) => {
-  const email = req.body.email
-  const type = req.body.type
-  await slouch.doc.create(INQUIRIES_DB, {
-    email, type
+app.get('/createUsersDB', async (req, res) => {
+  const tableName = 'equesteo_users'
+  try {
+    const ddbService = new DynamoDBService()
+    await ddbService.deleteTable(tableName)
+  } catch (e) {}
+
+  const ddbService = new DynamoDBService()
+  await ddbService.createTable('email', 'S', tableName)
+  return res.json({"all": "done"})
+})
+
+app.get('/migrateUsersData', async (req, res) => {
+  const tableName = 'equesteo_users'
+  const ddbService = new DynamoDBService()
+  slouch.doc.all(USERS_DB, {include_docs: true}).each(async (item) => {
+    if (item.doc.type === 'user') {
+      const newItem = {}
+      newItem.email = {S: item.doc.email}
+      newItem.password = {S: item.doc.password}
+      newItem.id = {S: item.doc._id}
+      if (item.doc.fcmToken) {
+        newItem.fcmToken = {S: item.doc.fcmToken}
+      }
+      await ddbService.putItem(tableName, newItem)
+      const resp = await ddbService.getItem(tableName, { email: {S: item.doc.email }})
+      console.log(resp)
+    }
   })
-  return res.json({})
-})
-
-app.post('/users', bodyParser.json(), async (req, res) => {
-  const email = req.body.email
-  const password = req.body.password
-  const result = await slouch.db.viewArray(USERS_DB, USERS_DESIGN_DOC, 'by_email', { key: `"${email}"`})
-  const found = result.rows
-  if (found.length) {
-    return res.status(400).json({'error': 'User already exists'})
-  }
-  const hashed = bcrypt.hashSync(password, bcrypt.genSaltSync(10));
-  // @TODO: 'split this into public and private records'
-  const newUser = await slouch.doc.create(USERS_DB, {
-    email,
-    password: hashed,
-    firstName: null,
-    lastName: null,
-    aboutMe: null,
-    profilePhotoID: null,
-    photosByID: {},
-    ridesDefaultPublic: true,
-    type: 'user',
-    createTime: unixTimeNow()
-  })
-  const token = jwt.sign(
-    { id: newUser.id, email },
-    configGet(TOP_SECRET_JWT_TOKEN)
-  );
-  return res.json({
-    id: newUser.id,
-    token
-  })
-})
-
-
-app.post('/users/login', bodyParser.json(), async (req, res) => {
-  console.log('user logging in')
-  const email = req.body.email
-  const password = req.body.password
-  const result = await slouch.db.viewArray(
-    USERS_DB,
-    USERS_DESIGN_DOC,
-    'by_email',
-    { key: `"${email}"`, include_docs: true}
-  )
-  const found = result.rows
-  if (!password || found.length < 1 || !bcrypt.compareSync(password, found[0].value)) {
-    return res.status(401).json({'error': 'Wrong username/password'})
-  } else if (found.length === 1) {
-    const token = jwt.sign(
-      {
-        id: found[0].id,
-        email,
-      },
-      configGet(TOP_SECRET_JWT_TOKEN)
-    )
-
-    const following = await slouch.db.viewArray(
-      USERS_DB,
-      USERS_DESIGN_DOC,
-      'following',
-      { key: `"${found[0].id}"`}
-    )
-    const followers = await slouch.db.viewArray(
-      USERS_DB,
-      USERS_DESIGN_DOC,
-      'followers',
-      { key: `"${found[0].id}"`}
-    )
-    return res.json({
-      id: found[0].id,
-      followers: followers.rows.map(f => f.value),
-      following: following.rows.map(f => f.value),
-      token
-    })
-  } else if (found.length > 1) {
-    throw Error('Multiple records with one email found!')
-  }
-})
-
-app.post('/users/getPWCode', bodyParser.json(), async (req, res) => {
-  const email = req.body.email
-  const result = await slouch.db.viewArray(
-    USERS_DB,
-    USERS_DESIGN_DOC,
-    'by_email',
-    { key: `"${email}"`, include_docs: true}
-  )
-  const found = result.rows
-  if (found.length === 1) {
-    const code = pwResetCode()
-    const noWhitespace = code.replace(/\s+/g, '')
-    const doc = found[0].doc
-    const newDoc = Object.assign({}, doc, { pwResetCode: noWhitespace })
-    await slouch.doc.update(USERS_DB, newDoc)
-
-    const emailer = new EmailerService()
-    emailer.sendCode(email, code)
-  }
-  return res.json({})
-})
-
-
-app.post('/users/exchangePWCode', bodyParser.json(), async (req, res) => {
-  const email = req.body.email
-  const code = req.body.code.replace(/\s+/g, '')
-  const result = await slouch.db.viewArray(
-    USERS_DB,
-    USERS_DESIGN_DOC,
-    'by_email',
-    { key: `"${email}"`, include_docs: true}
-  )
-  const found = result.rows
-  if (found.length < 1 || code !== found[0].doc.pwResetCode) {
-    return res.status(401).json({'error': 'Wrong email/code.'})
-  } else if (found.length === 1) {
-    const doc = found[0].doc
-    const token = jwt.sign(
-      {
-        id: found[0].id,
-        email,
-      },
-      configGet(TOP_SECRET_JWT_TOKEN)
-    );
-    const following = await slouch.db.viewArray(
-      USERS_DB,
-      USERS_DESIGN_DOC,
-      'following',
-      { key: `"${found[0].id}"`}
-    )
-    const followers = await slouch.db.viewArray(
-      USERS_DB,
-      USERS_DESIGN_DOC,
-      'followers',
-      { key: `"${found[0].id}"`}
-    )
-
-    const newDoc = Object.assign({}, doc, { pwResetCode: null })
-    await slouch.doc.update(USERS_DB, newDoc)
-    return res.json({
-      id: found[0].id,
-      following:  following.rows.map(f => f.value),
-      followers: followers.rows.map(f => f.value),
-      token
-    })
-  }
-})
-
-app.post('/users/changePW', authenticator, bodyParser.json(), async (req, res) => {
-  const email = res.locals.userEmail
-  const password = req.body.password
-  const hashed = bcrypt.hashSync(password, bcrypt.genSaltSync(10));
-
-  const result = await slouch.db.viewArray(
-    USERS_DB,
-    USERS_DESIGN_DOC,
-    'by_email',
-    { key: `"${email}"`, include_docs: true}
-  )
-  const found = result.rows
-  const doc = found[0].doc
-  const newDoc = Object.assign({}, doc, { password: hashed })
-  await slouch.doc.update(USERS_DB, newDoc)
-  return res.json({})
-})
-
-app.get('*.php', (req, res) => {
-  return res.json({fuck: 'you'})
+  return res.json({'done': "now"})
 })
 
 const userMeta = multer({

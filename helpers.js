@@ -56,7 +56,7 @@ export function staticMap (ride) {
 export function pwResetCode () {
   let text = "";
   const possible = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-  const codeLength = 8
+  const codeLength = 16
   for (let i = 1; i <= codeLength; i++) {
     text += possible.charAt(Math.floor(Math.random() * possible.length));
     if (i % 4 === 0 && i !== codeLength) {
