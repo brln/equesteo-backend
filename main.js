@@ -18,7 +18,6 @@ import {
   ELASTICSEARCH_HOST,
   GCM_API_KEY,
 } from "./config"
-import DynamoDBService from './services/dynamoDB'
 import { currentTime } from './helpers'
 import { postRide } from './controllers/gpxUploader'
 import { couchProxy } from './controllers/couchProxy'
@@ -26,6 +25,7 @@ import { users } from './controllers/users'
 import { createUsersDesignDoc, USERS_DB, USERS_DESIGN_DOC } from "./design_docs/users"
 import { createHorsesDesignDoc } from "./design_docs/horses"
 import { createRidesDesignDoc } from './design_docs/rides'
+import DynamoDBService from './services/dynamoDB'
 
 const app = express()
 const s3 = new aws.S3()
@@ -66,7 +66,7 @@ const ESClient = new elasticsearch.Client({
   host: configGet(ELASTICSEARCH_HOST),
 })
 
-const sender = new gcm.Sender(configGet(GCM_API_KEY));
+
 
 function startChangesFeedForPush() {
   let iterator = slouch.db.changes('rides', {
@@ -75,6 +75,11 @@ function startChangesFeedForPush() {
     heartbeat: true,
     since: 'now'
   })
+
+  const sender = new gcm.Sender(configGet(GCM_API_KEY));
+
+  const ddbService = new DynamoDBService()
+  const TABLE_NAME = 'equesteo_fcm_tokens'
 
   iterator.each(async (item) => {
     if (item.doc && item.doc.type === 'ride'
@@ -86,36 +91,40 @@ function startChangesFeedForPush() {
         USERS_DB,
         USERS_DESIGN_DOC,
         'followers',
-        { key: `"${userID}"`, include_docs: true }
+        { key: `"${userID}"` }
       )
 
-      const user = await slouch.doc.get(USERS_DB, item.doc.userID)
-      const followerFCMTokens = []
-      followers.rows.reduce((r, e) => {
-        if (e.doc.fcmToken) r.push(e.doc.fcmToken)
-        console.log(e.doc.email)
-        return r
-      }, followerFCMTokens)
-
-      const message = new gcm.Message({
-        data: {
-          rideID: item.doc._id,
-          userID: item.doc.userID,
-          userName: `${user.firstName} ${user.lastName}`,
-          distance: item.doc.distance,
+      const followerFCMTokens = await followers.rows.reduce(async (r, e) => {
+        const found = await ddbService.getItem(TABLE_NAME, { id: {S: e.value._id }})
+        if (found && found.fcmToken.S) {
+          r.push(found.fcmToken.S)
         }
-      });
-      try{
-        sender.send(
-          message,
-          { registrationTokens: followerFCMTokens },
-          (err, response) => {
-            if (err) console.error(err);
-            else console.log(response);
-          }
-        );
-      } catch (e) {
-        console.log(e)
+        return r
+      }, [])
+
+      if (followerFCMTokens.length > 0) {
+        const user = await slouch.doc.get(USERS_DB, item.doc.userID)
+        const message = new gcm.Message({
+          data: {
+            rideID: item.doc._id,
+            userID: item.doc.userID,
+            userName: `${user.firstName} ${user.lastName}`,
+            distance: item.doc.distance,
+          },
+          priority: 'high'
+        });
+        try {
+          sender.send(
+            message,
+            {registrationTokens: followerFCMTokens},
+            (err, response) => {
+              if (err) console.error(err);
+              else console.log(response);
+            }
+          );
+        } catch (e) {
+          console.log(e)
+        }
       }
     }
   })
@@ -164,6 +173,18 @@ function startChangesFeedForElastic () {
     return Promise.resolve()
   })
 }
+
+app.get('/createFCMDB', async (req, res) => {
+  const tableName = 'equesteo_fcm_tokens'
+  try {
+    const ddbService = new DynamoDBService()
+    await ddbService.deleteTable(tableName)
+  } catch (e) {}
+
+  const ddbService = new DynamoDBService()
+  await ddbService.createTable('id', 'S', tableName)
+  return res.json({"all": "done"})
+})
 
 // app.get('/createUsersDB', async (req, res) => {
 //   const tableName = 'equesteo_users'

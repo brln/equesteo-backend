@@ -22,6 +22,7 @@ const slouch = new Slouch(
 );
 
 const USERS_TABLE_NAME = 'equesteo_users'
+const FCM_TABLE_NAME = 'equesteo_fcm_tokens'
 
 export function users (app) {
   app.post('/users/login', bodyParser.json(), async (req, res) => {
@@ -86,7 +87,8 @@ export function users (app) {
         photosByID: {},
         ridesDefaultPublic: true,
         type: 'user',
-        createTime: unixTimeNow()
+        createTime: unixTimeNow(),
+        finishedFirstStart: false
       })
       await slouch.doc.create(USERS_DB, {
         "_id": `${newUser.id}_${configGet(NICOLE_USER_ID)}`,
@@ -185,6 +187,21 @@ export function users (app) {
     found.password = {S: hashed}
     await ddbService.putItem(USERS_TABLE_NAME, found)
 
+    return res.json({})
+  })
+
+  app.post('/users/setFCMToken', authenticator, bodyParser.json(), async (req, res) => {
+    const id = req.body.id
+    const fcmToken = req.body.token
+    const ddbService = new DynamoDBService()
+    let found = await ddbService.getItem(FCM_TABLE_NAME, { id: {S: id }})
+    if (found) {
+      found.fcmToken = {S: fcmToken}
+    } else {
+      found = { id: {S: id}, fcmToken: {S: fcmToken}}
+    }
+    console.log(found)
+    await ddbService.putItem(FCM_TABLE_NAME, found)
     return res.json({})
   })
 }

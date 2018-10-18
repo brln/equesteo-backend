@@ -70,9 +70,6 @@ export default class DynamoDBService {
         TableName: tableName,
         Item: item
       }
-
-      console.log(params)
-
       this.ddb.putItem(params, function (err, data) {
         if (err) {
           reject(err)
