@@ -33,7 +33,7 @@ const s3 = new aws.S3()
 aws.config.update({
   secretAccessKey: configGet(AWS_SECRET_ACCESS_KEY),
   accessKeyId: configGet(AWS_ACCESS_KEY_ID),
-  region: 'us-east-1'
+  region: 'us-west-1'
 });
 
 const logger = (req, res, next) => {
@@ -95,7 +95,13 @@ function startChangesFeedForPush() {
       )
 
       const followerFCMTokens = await followers.rows.reduce(async (r, e) => {
-        const found = await ddbService.getItem(TABLE_NAME, { id: {S: e.value._id }})
+        let found
+        try {
+          found = await ddbService.getItem(TABLE_NAME, { id: {S: e.value._id }})
+        } catch (e) {
+          console.log('id not found: ' + e)
+        }
+
         if (found && found.fcmToken.S) {
           r.push(found.fcmToken.S)
         }
