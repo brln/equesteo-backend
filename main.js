@@ -66,8 +66,6 @@ const ESClient = new elasticsearch.Client({
   host: configGet(ELASTICSEARCH_HOST),
 })
 
-
-
 function startChangesFeedForPush() {
   let iterator = slouch.db.changes('rides', {
     include_docs: true,
@@ -95,19 +93,19 @@ function startChangesFeedForPush() {
       )
       console.log(`found ${followers.rows.length} follower records in couch`)
 
-      const followerFCMTokens = await followers.rows.reduce(async (r, e) => {
+      const followerFCMTokens = []
+      for (let follower of followers.rows) {
         let found
         try {
-          found = await ddbService.getItem(TABLE_NAME, { id: {S: e.value._id }})
+          found = await ddbService.getItem(TABLE_NAME, { id: {S: follower.value._id }})
         } catch (e) {
           console.log('id not found: ' + e)
         }
 
         if (found && found.fcmToken.S) {
-          r.push(found.fcmToken.S)
+          followerFCMTokens.push(found.fcmToken.S)
         }
-        return r
-      }, [])
+      }
       console.log(`found ${followerFCMTokens.length} follower tokens in dynamodb`)
 
       if (followerFCMTokens.length > 0) {
@@ -130,7 +128,7 @@ function startChangesFeedForPush() {
               if (err) {
                 console.error(err);
               } else {
-                console.log('fmc send success')
+                console.log('FCM send response: ============')
                 console.log(response);
               }
             }
