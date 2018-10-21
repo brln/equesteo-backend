@@ -93,6 +93,7 @@ function startChangesFeedForPush() {
         'followers',
         { key: `"${userID}"` }
       )
+      console.log(`found ${followers.rows.length} follower records in couch`)
 
       const followerFCMTokens = await followers.rows.reduce(async (r, e) => {
         let found
@@ -107,8 +108,10 @@ function startChangesFeedForPush() {
         }
         return r
       }, [])
+      console.log(`found ${followerFCMTokens.length} follower tokens in dynamodb`)
 
       if (followerFCMTokens.length > 0) {
+        console.log('attempting to send FCM messages')
         const user = await slouch.doc.get(USERS_DB, item.doc.userID)
         const message = new gcm.Message({
           data: {
@@ -124,8 +127,12 @@ function startChangesFeedForPush() {
             message,
             {registrationTokens: followerFCMTokens},
             (err, response) => {
-              if (err) console.error(err);
-              else console.log(response);
+              if (err) {
+                console.error(err);
+              } else {
+                console.log('fmc send success')
+                console.log(response);
+              }
             }
           );
         } catch (e) {
