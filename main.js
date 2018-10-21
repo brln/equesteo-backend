@@ -6,6 +6,7 @@ import multerS3 from 'multer-s3'
 import path from 'path'
 import Slouch from 'couch-slouch'
 import elasticsearch from 'elasticsearch'
+import * as Sentry from '@sentry/node'
 
 import { authenticator } from './auth'
 import {
@@ -28,6 +29,11 @@ import { createRidesDesignDoc } from './design_docs/rides'
 import DynamoDBService from './services/dynamoDB'
 
 const app = express()
+
+Sentry.init({ dsn: 'https://04b0f2944b3d43af8fc7d039a8bb6359@sentry.io/1305626' });
+app.use(Sentry.Handlers.requestHandler());
+
+
 const s3 = new aws.S3()
 
 aws.config.update({
@@ -37,8 +43,8 @@ aws.config.update({
 });
 
 const logger = (req, res, next) => {
-    next(); // Passing the request to the next handler in the stack.
-    console.log(`${currentTime()} - ${req.method}: ${req.url}` )
+  next(); // Passing the request to the next handler in the stack.
+  console.log(`${currentTime()} - ${req.method}: ${req.url}` )
 }
 
 app.use(logger)
@@ -197,6 +203,10 @@ app.get('/createFCMDB', async (req, res) => {
   return res.json({"all": "done"})
 })
 
+app.get('/errorTest', function mainHandler(req, res) {
+  throw new Error('Broke!');
+});
+
 // app.get('/createUsersDB', async (req, res) => {
 //   const tableName = 'equesteo_users'
 //   try {
@@ -287,6 +297,8 @@ app.get('/users/search', authenticator, async (req, res) => {
   console.log(docs)
   return res.json(docs)
 })
+
+app.use(Sentry.Handlers.errorHandler());
 
 app.listen(process.env.PORT || 8080, '0.0.0.0', function () {
   console.log('Example app listening on port 8080!');
