@@ -72,7 +72,7 @@ export function postRide (app) {
         startTime,
         type: 'ride',
         userID: resp.locals.userID,
-        isPublic: true,
+        isPublic: false,
       }
       ride.name = newRideName(ride)
       ride.mapURL = staticMap(ride)
