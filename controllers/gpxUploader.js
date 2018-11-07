@@ -85,7 +85,6 @@ export function postRide (app) {
         type: 'rideElevations',
         userID: resp.locals.userID,
       }
-      console.log(rideElevations)
       slouch.doc.create(RIDES_DB, rideElevations)
     })
 

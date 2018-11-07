@@ -8,7 +8,7 @@ export function createHorsesDesignDoc (slouch) {
       views: {
         allJoins: {
           map: function (doc) {
-            if (doc.type === 'horseUser') {
+            if (doc.type === 'horseUser' || doc.type === 'horsePhoto') {
               emit(doc.userID, doc.horseID)
             }
           }.toString()

@@ -42,7 +42,7 @@ export function staticMap (ride) {
     }
   })
 
-  let tolerance = 0.00025
+  let tolerance = 0.0002
   let lengthURL = false
   let fullURL
   while (!lengthURL || lengthURL > 6000) {

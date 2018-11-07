@@ -6,9 +6,10 @@ import {
 } from "../config"
 
 export default class DynamoDBService {
-  constructor () {
+  constructor (env=configGet(NODE_ENV)) {
     this.ddb = new aws.DynamoDB()
-    if (configGet(NODE_ENV) === 'local') {
+    this.ddbDocument = new aws.DynamoDB.DocumentClient();
+    if (env === 'local') {
       this.ddb.endpoint = configGet(DYNAMODB_ENDPOINT)
     } else {
       aws.config.update({region: 'us-west-1'});
@@ -77,6 +78,27 @@ export default class DynamoDBService {
           resolve(data)
         }
       });
+    })
+  }
+
+  async getAllItems (tableName) {
+    return new Promise((resolve, reject) => {
+      this.ddbDocument.scan({TableName: tableName}, (err, data) => {
+        if (err) {
+          console.log(err)
+          reject()
+        } else {
+          console.log("Scan succeeded.");
+          resolve(data.Items)
+          // @TODO: implement this when the db is big enough to need it
+          // continue scanning if we have more items
+          // if (typeof data.LastEvaluatedKey != "undefined") {
+          //   console.log("Scanning for more...");
+          //   params.ExclusiveStartKey = data.LastEvaluatedKey;
+          //   docClient.scan(params, onScan);
+          // }
+        }
+      })
     })
   }
 
