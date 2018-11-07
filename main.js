@@ -210,100 +210,100 @@ app.get('/errorTest', function mainHandler(req, res) {
   throw new Error('Broke!');
 });
 
-app.get('/moveRideCoords', async (req, res) => {
-  await slouch.doc.all(RIDES_DB, {include_docs: true}).each(async (item) => {
-    if (item.doc.type === 'ride') {
-      const rideCoordinates = item.doc.rideCoordinates
-      const newRideCoords = rideCoordinates.map(coord => {
-        return [
-          Number(coord.latitude.toFixed(6)),
-          Number(coord.longitude.toFixed(6)),
-          coord.timestamp,
-          coord.accuracy ? Number(coord.accuracy.toFixed(2)) : null
-        ]
-      })
-      const coordDoc = {
-        _id: item.doc._id + '_coordinates',
-        rideCoordinates: newRideCoords,
-        rideID: item.doc._id,
-        userID: item.doc.userID,
-        type: 'rideCoordinates',
-      }
-      delete item.doc.rideCoordinates
-      await slouch.doc.create(RIDES_DB, coordDoc)
-      await slouch.doc.update(RIDES_DB, item.doc)
-    }
-  })
-
-  const horses = {}
-  const horseUsers = []
-  await slouch.doc.all(HORSES_DB, {include_docs: true}).each(async (item) => {
-    if (item.doc.type === 'horseUser' && item.doc.owner) {
-      horseUsers.push(item.doc)
-    } else if (item.doc.type === 'horse') {
-      horses[item.doc._id] = item.doc
-    }
-  })
-
-  for (let horseUser of horseUsers) {
-    const horse = horses[horseUser.horseID]
-    const photos = horse.photosByID
-    for (let photoID of Object.keys(photos)) {
-      const newPhotoDoc = {
-        _id: photoID,
-        horseID: horse._id,
-        timestamp: photos[photoID].timestamp,
-        type: 'horsePhoto',
-        uri: photos[photoID].uri,
-        userID: horseUser.userID,
-      }
-      await slouch.doc.create(HORSES_DB, newPhotoDoc)
-    }
-    delete horse.photosByID
-    delete horse.userID
-    await slouch.doc.update(HORSES_DB, horse)
-  }
-
-
-  await slouch.doc.all(RIDES_DB, {include_docs: true}).each(async (item) => {
-    if (item.doc.type === 'ride') {
-      for (let photoID of Object.keys(item.doc.photosByID)) {
-        const newPhotoDoc = {
-          _id: photoID,
-          rideID: item.doc._id,
-          timestamp: item.doc.photosByID[photoID].timestamp,
-          type: 'ridePhoto',
-          uri: item.doc.photosByID[photoID].uri,
-          userID: item.doc.userID,
-        }
-        await slouch.doc.create(RIDES_DB, newPhotoDoc)
-      }
-      delete item.doc.photosByID
-      await slouch.doc.update(RIDES_DB, item.doc)
-    }
-  })
-
-  await slouch.doc.all(USERS_DB, {include_docs: true}).each(async (item) => {
-    if (item.doc.type === 'user') {
-      for (let photoID of Object.keys(item.doc.photosByID)) {
-        const newPhotoDoc = {
-          _id: photoID,
-          userID: item.doc._id,
-          timestamp: item.doc.photosByID[photoID].timestamp,
-          type: 'userPhoto',
-          uri: item.doc.photosByID[photoID].uri,
-        }
-        await slouch.doc.create(USERS_DB, newPhotoDoc)
-      }
-      delete item.doc.photosByID
-      await slouch.doc.update(USERS_DB, item.doc)
-    }
-  })
-
-
-
-  return res.json({'done': "now"})
-})
+// app.get('/moveRideCoords', async (req, res) => {
+//   await slouch.doc.all(RIDES_DB, {include_docs: true}).each(async (item) => {
+//     if (item.doc.type === 'ride') {
+//       const rideCoordinates = item.doc.rideCoordinates
+//       const newRideCoords = rideCoordinates.map(coord => {
+//         return [
+//           Number(coord.latitude.toFixed(6)),
+//           Number(coord.longitude.toFixed(6)),
+//           coord.timestamp,
+//           coord.accuracy ? Number(coord.accuracy.toFixed(2)) : null
+//         ]
+//       })
+//       const coordDoc = {
+//         _id: item.doc._id + '_coordinates',
+//         rideCoordinates: newRideCoords,
+//         rideID: item.doc._id,
+//         userID: item.doc.userID,
+//         type: 'rideCoordinates',
+//       }
+//       delete item.doc.rideCoordinates
+//       await slouch.doc.create(RIDES_DB, coordDoc)
+//       await slouch.doc.update(RIDES_DB, item.doc)
+//     }
+//   })
+//
+//   const horses = {}
+//   const horseUsers = []
+//   await slouch.doc.all(HORSES_DB, {include_docs: true}).each(async (item) => {
+//     if (item.doc.type === 'horseUser' && item.doc.owner) {
+//       horseUsers.push(item.doc)
+//     } else if (item.doc.type === 'horse') {
+//       horses[item.doc._id] = item.doc
+//     }
+//   })
+//
+//   for (let horseUser of horseUsers) {
+//     const horse = horses[horseUser.horseID]
+//     const photos = horse.photosByID
+//     for (let photoID of Object.keys(photos)) {
+//       const newPhotoDoc = {
+//         _id: photoID,
+//         horseID: horse._id,
+//         timestamp: photos[photoID].timestamp,
+//         type: 'horsePhoto',
+//         uri: photos[photoID].uri,
+//         userID: horseUser.userID,
+//       }
+//       await slouch.doc.create(HORSES_DB, newPhotoDoc)
+//     }
+//     delete horse.photosByID
+//     delete horse.userID
+//     await slouch.doc.update(HORSES_DB, horse)
+//   }
+//
+//
+//   await slouch.doc.all(RIDES_DB, {include_docs: true}).each(async (item) => {
+//     if (item.doc.type === 'ride') {
+//       for (let photoID of Object.keys(item.doc.photosByID)) {
+//         const newPhotoDoc = {
+//           _id: photoID,
+//           rideID: item.doc._id,
+//           timestamp: item.doc.photosByID[photoID].timestamp,
+//           type: 'ridePhoto',
+//           uri: item.doc.photosByID[photoID].uri,
+//           userID: item.doc.userID,
+//         }
+//         await slouch.doc.create(RIDES_DB, newPhotoDoc)
+//       }
+//       delete item.doc.photosByID
+//       await slouch.doc.update(RIDES_DB, item.doc)
+//     }
+//   })
+//
+//   await slouch.doc.all(USERS_DB, {include_docs: true}).each(async (item) => {
+//     if (item.doc.type === 'user') {
+//       for (let photoID of Object.keys(item.doc.photosByID)) {
+//         const newPhotoDoc = {
+//           _id: photoID,
+//           userID: item.doc._id,
+//           timestamp: item.doc.photosByID[photoID].timestamp,
+//           type: 'userPhoto',
+//           uri: item.doc.photosByID[photoID].uri,
+//         }
+//         await slouch.doc.create(USERS_DB, newPhotoDoc)
+//       }
+//       delete item.doc.photosByID
+//       await slouch.doc.update(USERS_DB, item.doc)
+//     }
+//   })
+//
+//
+//
+//   return res.json({'done': "now"})
+// })
 
 // app.get('/replicateProd', async (req, res) => {
 //   if (configGet(NODE_ENV) !== 'local') {
