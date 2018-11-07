@@ -1,6 +1,7 @@
 import aws from 'aws-sdk'
 import express from 'express'
 import gcm from 'node-gcm'
+import mbxStatic from '@mapbox/mapbox-sdk/services/static'
 import multer from 'multer'
 import multerS3 from 'multer-s3'
 import path from 'path'
@@ -18,6 +19,7 @@ import {
   COUCH_USERNAME,
   ELASTICSEARCH_HOST,
   GCM_API_KEY,
+  MAPBOX_TOKEN,
   NODE_ENV,
 } from "./config"
 import { currentTime } from './helpers'
@@ -209,6 +211,42 @@ app.get('/createFCMDB', async (req, res) => {
 app.get('/errorTest', function mainHandler(req, res) {
   throw new Error('Broke!');
 });
+
+
+let count = 0
+app.get('/changeMaps', async (req, res) => {
+  const staticService = mbxStatic({accessToken: configGet(MAPBOX_TOKEN)})
+  await slouch.doc.all(RIDES_DB, {include_docs: true}).each(async (item) => {
+    if (item.doc.type === 'ride') {
+      console.log(count)
+      const coordinates = await slouch.doc.get(RIDES_DB, `${item.doc._id}_coordinates`, {include_docs: true})
+      const parsed = coordinates.rideCoordinates.reduce((accum, coord) => {
+        accum.push([coord[1], coord[0]])
+        return accum
+      }, [])
+      const request = await staticService.getStaticImage({
+        ownerId: 'equesteo',
+        styleId: 'cjn3zysq408tc2sk1g1gunqmq',
+        width: 600,
+        height: 400,
+        position: 'auto',
+        overlays: [{
+          path: {
+            strokeWidth: 5,
+            strokeColor: 'ea5b60',
+            coordinates: parsed
+          }
+        }]
+      })
+      item.doc.mapURL = request.url()
+      await slouch.doc.update(RIDES_DB, item.doc)
+      count += 1
+    }
+  })
+
+
+  return res.json({'all': 'done'})
+})
 
 // app.get('/moveRideCoords', async (req, res) => {
 //   await slouch.doc.all(RIDES_DB, {include_docs: true}).each(async (item) => {
