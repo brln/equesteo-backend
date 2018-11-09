@@ -213,40 +213,40 @@ app.get('/errorTest', function mainHandler(req, res) {
 });
 
 
-let count = 0
-app.get('/changeMaps', async (req, res) => {
-  const staticService = mbxStatic({accessToken: configGet(MAPBOX_TOKEN)})
-  await slouch.doc.all(RIDES_DB, {include_docs: true}).each(async (item) => {
-    if (item.doc.type === 'ride') {
-      console.log(count)
-      const coordinates = await slouch.doc.get(RIDES_DB, `${item.doc._id}_coordinates`, {include_docs: true})
-      const parsed = coordinates.rideCoordinates.reduce((accum, coord) => {
-        accum.push([coord[1], coord[0]])
-        return accum
-      }, [])
-      const request = await staticService.getStaticImage({
-        ownerId: 'equesteo',
-        styleId: 'cjn3zysq408tc2sk1g1gunqmq',
-        width: 600,
-        height: 400,
-        position: 'auto',
-        overlays: [{
-          path: {
-            strokeWidth: 5,
-            strokeColor: 'ea5b60',
-            coordinates: parsed
-          }
-        }]
-      })
-      item.doc.mapURL = request.url()
-      await slouch.doc.update(RIDES_DB, item.doc)
-      count += 1
-    }
-  })
-
-
-  return res.json({'all': 'done'})
-})
+// let count = 0
+// app.get('/changeMaps', async (req, res) => {
+//   const staticService = mbxStatic({accessToken: configGet(MAPBOX_TOKEN)})
+//   await slouch.doc.all(RIDES_DB, {include_docs: true}).each(async (item) => {
+//     if (item.doc.type === 'ride') {
+//       console.log(count)
+//       const coordinates = await slouch.doc.get(RIDES_DB, `${item.doc._id}_coordinates`, {include_docs: true})
+//       const parsed = coordinates.rideCoordinates.reduce((accum, coord) => {
+//         accum.push([coord[1], coord[0]])
+//         return accum
+//       }, [])
+//       const request = await staticService.getStaticImage({
+//         ownerId: 'equesteo',
+//         styleId: 'cjn3zysq408tc2sk1g1gunqmq',
+//         width: 600,
+//         height: 400,
+//         position: 'auto',
+//         overlays: [{
+//           path: {
+//             strokeWidth: 5,
+//             strokeColor: 'ea5b60',
+//             coordinates: parsed
+//           }
+//         }]
+//       })
+//       item.doc.mapURL = request.url()
+//       await slouch.doc.update(RIDES_DB, item.doc)
+//       count += 1
+//     }
+//   })
+//
+//
+//   return res.json({'all': 'done'})
+// })
 
 // app.get('/moveRideCoords', async (req, res) => {
 //   await slouch.doc.all(RIDES_DB, {include_docs: true}).each(async (item) => {
