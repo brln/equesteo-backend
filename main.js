@@ -28,7 +28,7 @@ import { couchProxy } from './controllers/couchProxy'
 import { users } from './controllers/users'
 import { createUsersDesignDoc, USERS_DB, USERS_DESIGN_DOC } from "./design_docs/users"
 import { createHorsesDesignDoc, HORSES_DB } from "./design_docs/horses"
-import { createRidesDesignDoc, RIDES_DB } from './design_docs/rides'
+import { createRidesDesignDoc, RIDES_DB, RIDES_DESIGN_DOC } from './design_docs/rides'
 import DynamoDBService from './services/dynamoDB'
 
 const app = express()
@@ -90,64 +90,114 @@ function startChangesFeedForPush() {
   const ddbService = new DynamoDBService()
   const TABLE_NAME = 'equesteo_fcm_tokens'
 
-  iterator.each(async (item) => {
-    if (item.doc && item.doc.type === 'ride'
-      && item.doc._rev.split('-')[0] === '1'
-      && item.doc.isPublic === true) {
-      const userID = item.doc.userID
-      if (!userID) throw Error('wut why not')
-      const followers = await slouch.db.viewArray(
+  iterator.each((rideRecord) => {
+    if (rideRecord.doc && rideRecord.doc.type === 'ride'
+      && rideRecord.doc._rev.split('-')[0] === '1'
+      && rideRecord.doc.isPublic === true) {
+      const userID = rideRecord.doc.userID
+      if (!userID) {
+        throw Error('wut why not')
+      }
+
+      const followersPromise = slouch.db.viewArray(
         USERS_DB,
         USERS_DESIGN_DOC,
         'followers',
         { key: `"${userID}"` }
       )
-      console.log(`found ${followers.rows.length} follower records in couch`)
+      const userPromise = slouch.doc.get(USERS_DB, rideRecord.doc.userID)
+      let foundUser
+      Promise.all([followersPromise, userPromise]).then(([followers, userRecord]) => {
+        foundUser = userRecord
+        return Promise.all(followers.rows.map((followerFromView) => {
+          return ddbService.getItem(TABLE_NAME, {id: {S: followerFromView.value._id}})
+        }))
+      }).then((ddbRecords) => {
+        console.log(ddbRecords)
+        const allTokens = ddbRecords.reduce((accum, ddbRecord) => {
+          if (ddbRecord && ddbRecord.fcmToken.S) {
+            accum.push(ddbRecord.fcmToken.S)
+          }
+          return accum
+        }, [])
 
-      const followerFCMTokens = []
-      for (let follower of followers.rows) {
-        let found
-        try {
-          found = await ddbService.getItem(TABLE_NAME, { id: {S: follower.value._id }})
-        } catch (e) {
-          console.log('id not found: ' + e)
-        }
-
-        if (found && found.fcmToken.S) {
-          followerFCMTokens.push(found.fcmToken.S)
-        }
-      }
-      console.log(`found ${followerFCMTokens.length} follower tokens in dynamodb`)
-
-      if (followerFCMTokens.length > 0) {
-        console.log('attempting to send FCM messages')
-        const user = await slouch.doc.get(USERS_DB, item.doc.userID)
         const message = new gcm.Message({
           data: {
-            rideID: item.doc._id,
-            userID: item.doc.userID,
-            userName: `${user.firstName} ${user.lastName}`,
-            distance: item.doc.distance,
+            rideID: rideRecord.doc._id,
+            userID: rideRecord.doc.userID,
+            userName: `${foundUser.firstName} ${foundUser.lastName}`,
+            distance: rideRecord.doc.distance,
           },
           priority: 'high'
         });
-        try {
-          sender.send(
-            message,
-            {registrationTokens: followerFCMTokens},
-            (err, response) => {
-              if (err) {
-                console.error(err);
-              } else {
-                console.log('FCM send response: ============')
-                console.log(response);
-              }
+        sender.send(
+          message,
+          {registrationTokens: allTokens},
+          (err, response) => {
+            if (err) {
+              throw err
+            } else {
+              console.log('FCM send response: ============')
+              console.log(response);
             }
-          );
-        } catch (e) {
-          console.log(e)
-        }
-      }
+          }
+        );
+      }).catch(e => {
+        Sentry.captureException(e)
+        console.log(e)
+      })
+    } else if (rideRecord.doc && rideRecord.doc.type === 'comment'
+        && rideRecord.doc._rev.split('-')[0] === '1') {
+      const ridePromise = slouch.doc.get(RIDES_DB, rideRecord.doc.rideID, {include_docs: true})
+      const commentsPromise = slouch.db.viewArray(
+        RIDES_DB,
+        RIDES_DESIGN_DOC,
+        'commentUsers',
+        { key: `"${rideRecord.doc.rideID}"` }
+      )
+      Promise.all([ridePromise, commentsPromise]).then(([ride, comments]) => {
+        let userIDs = {}
+        userIDs[ride.userID] = true
+        userIDs = Object.keys(comments.rows.reduce((accum, couchRecord) => {
+          accum[couchRecord.value] = true
+          return accum
+        }, userIDs))
+        return Promise.all(userIDs.map((userID) => {
+          return ddbService.getItem(TABLE_NAME, {id: {S: userID}})
+        }))
+      }).then(ddbRecords => {
+        const allTokens = ddbRecords.reduce((accum, ddbRecord) => {
+          if (ddbRecord && ddbRecord.fcmToken.S) {
+            accum.push(ddbRecord.fcmToken.S)
+          }
+          return accum
+        }, [])
+
+        const message = new gcm.Message({
+          data: {
+            rideID: rideRecord.doc._id,
+            userID: rideRecord.doc.userID,
+            userName: `${foundUser.firstName} ${foundUser.lastName}`,
+            distance: rideRecord.doc.distance,
+          },
+          priority: 'high'
+        });
+        sender.send(
+          message,
+          {registrationTokens: allTokens},
+          (err, response) => {
+            if (err) {
+              throw err
+            } else {
+              console.log('FCM send response: ============')
+              console.log(response);
+            }
+          }
+        );
+      }).catch((e) => {
+        console.log(e)
+      })
+
     }
   })
 }
