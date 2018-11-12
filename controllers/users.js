@@ -140,8 +140,11 @@ export function users (app) {
     const code = req.body.code.replace(/\s+/g, '').toLowerCase()
     const ddbService = new DynamoDBService()
     const found = await ddbService.getItem(USERS_TABLE_NAME, { email: {S: email }})
+    if (!found || !found.pwResetCode.S) {
+      return res.status(401).json({'error': 'Wrong email/code.'})
+    }
     const lowerNoWhitespace = found.pwResetCode.S.toLowerCase().replace(/\s+/g, '')
-    if (!found || code !== lowerNoWhitespace) {
+    if (code !== lowerNoWhitespace) {
       return res.status(401).json({'error': 'Wrong email/code.'})
     } else {
       const foundID = found.id.S
