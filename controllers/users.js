@@ -1,6 +1,5 @@
 import bcrypt from 'bcryptjs'
 import bodyParser from 'body-parser'
-import jwt from 'jsonwebtoken'
 import Slouch from 'couch-slouch'
 
 import { authenticator } from '../auth'
@@ -10,9 +9,8 @@ import {
   COUCH_PASSWORD,
   COUCH_USERNAME,
   NICOLE_USER_ID,
-  TOP_SECRET_JWT_TOKEN
 } from "../config"
-import { pwResetCode, unixTimeNow } from '../helpers'
+import { makeToken, pwResetCode, unixTimeNow } from '../helpers'
 import DynamoDBService from '../services/dynamoDB'
 import EmailerService from '../services/emailer'
 import { USERS_DB, USERS_DESIGN_DOC } from "../design_docs/users"
@@ -24,25 +22,36 @@ const slouch = new Slouch(
 const USERS_TABLE_NAME = 'equesteo_users'
 const FCM_TABLE_NAME = 'equesteo_fcm_tokens'
 
+
 export function users (app) {
-  app.post('/users/login', bodyParser.json(), async (req, res) => {
+  app.post('/users/login', bodyParser.json(), async (req, res, next) => {
     console.log('user logging in')
     const email = req.body.email
     const password = req.body.password
 
     const ddbService = new DynamoDBService()
-    const found = await ddbService.getItem(USERS_TABLE_NAME, { email: {S: email }})
+    let found
+    try {
+      found = await ddbService.getItem(USERS_TABLE_NAME, { email: {S: email }})
+    } catch (e) {
+      console.log(e)
+      next(e)
+    }
+
     if (!password || !found || !bcrypt.compareSync(password, found.password.S)) {
       return res.status(401).json({'error': 'Wrong username/password'})
+    } else if (!found.enabled || found.enabled.BOOL !== true) {
+      return res.status(401).json({'error': 'Account is disabled.'})
     } else {
       const foundID = found.id.S
-      const token = jwt.sign(
-        {
-          id: foundID,
-          email,
-        },
-        configGet(TOP_SECRET_JWT_TOKEN)
-      )
+      const { token, refreshToken } = makeToken(foundID, email)
+
+      found.refreshToken = {S: refreshToken}
+      try {
+        await ddbService.putItem(USERS_TABLE_NAME, found)
+      } catch (e) {
+        next(e)
+      }
 
       const following = await slouch.db.viewArray(
         USERS_DB,
@@ -56,17 +65,19 @@ export function users (app) {
         'followers',
         { key: `"${foundID}"`}
       )
-      return res.json({
+      console.log(token)
+      res.set('x-auth-token', token).json({
         id: foundID,
+        token, // remove this when everyone is on > 0.45.0
         followers: followers.rows.map(f => f.value),
         following: following.rows.map(f => f.value),
-        token
       })
     }
   })
 
 
-  app.post('/users', bodyParser.json(), async (req, res) => {
+  app.post('/users', bodyParser.json(), async (req, res, next) => {
+    console.log('creating new user')
     const email = req.body.email
     const password = req.body.password
 
@@ -77,44 +88,45 @@ export function users (app) {
     }
     const hashed = bcrypt.hashSync(password, bcrypt.genSaltSync(10));
 
-    let newUser
-    try {
-      newUser = await slouch.doc.create(USERS_DB, {
-        firstName: null,
-        lastName: null,
-        aboutMe: null,
-        profilePhotoID: null,
-        photosByID: {},
-        ridesDefaultPublic: true,
-        type: 'user',
-        createTime: unixTimeNow(),
-        finishedFirstStart: false
-      })
-      await slouch.doc.create(USERS_DB, {
+    slouch.doc.create(USERS_DB, {
+      firstName: null,
+      lastName: null,
+      aboutMe: null,
+      profilePhotoID: null,
+      photosByID: {},
+      ridesDefaultPublic: true,
+      type: 'user',
+      createTime: unixTimeNow(),
+      finishedFirstStart: false
+    }).then(newUser => {
+      console.log('new user created')
+      return slouch.doc.create(USERS_DB, {
         "_id": `${newUser.id}_${configGet(NICOLE_USER_ID)}`,
         "followingID": configGet(NICOLE_USER_ID),
         "followerID": newUser.id,
         "deleted": false,
         "type": "follow"
+      }).then(() => {
+        console.log('nicole follow created')
+        const { token, refreshToken } = makeToken(newUser.id, email)
+        return ddbService.putItem(USERS_TABLE_NAME, {
+          email: {S: email},
+          password: {S: hashed},
+          id: {S: newUser.id},
+          enabled: {BOOL: true},
+          refreshToken: {S: refreshToken}
+        }).then(() => {
+          console.log('ddb record created')
+          res.set('x-auth-token', token).json({
+            id: newUser.id,
+            token, // remove this when everyone is on > 0.45.0
+            following: [configGet(NICOLE_USER_ID)],
+            followers: [],
+          })
+        })
       })
-
-      await ddbService.putItem(USERS_TABLE_NAME, {
-        email: {S: email},
-        password: {S: hashed},
-        id: {S: newUser.id},
-      })
-    } catch (e) {
-      throw e
-    }
-
-    const token = jwt.sign(
-      { id: newUser.id, email },
-      configGet(TOP_SECRET_JWT_TOKEN)
-    );
-    return res.json({
-      id: newUser.id,
-      token,
-      following: [configGet(NICOLE_USER_ID)],
+    }).catch(e => {
+      next(e)
     })
   })
 
@@ -123,14 +135,17 @@ export function users (app) {
     const ddbService = new DynamoDBService()
     const found = await ddbService.getItem(USERS_TABLE_NAME, { email: {S: email }})
     if (found) {
-      const code = pwResetCode()
-      const noWhitespace = code.replace(/\s+/g, '')
-      console.log (found)
-      found.pwResetCode = {S: noWhitespace}
-      await ddbService.putItem(USERS_TABLE_NAME, found)
+      if (found.enabled.BOOL === false) {
+        return res.status(401).json({'error': 'Account is disabled.'})
+      } else {
+        const code = pwResetCode()
+        const noWhitespace = code.replace(/\s+/g, '')
+        found.pwResetCode = {S: noWhitespace}
+        await ddbService.putItem(USERS_TABLE_NAME, found)
 
-      const emailer = new EmailerService()
-      emailer.sendCode(email, code)
+        const emailer = new EmailerService()
+        emailer.sendCode(email, code)
+      }
     }
     return res.json({})
   })
@@ -148,13 +163,7 @@ export function users (app) {
       return res.status(401).json({'error': 'Wrong email/code.'})
     } else {
       const foundID = found.id.S
-      const token = jwt.sign(
-        {
-          id: foundID,
-          email,
-        },
-        configGet(TOP_SECRET_JWT_TOKEN)
-      );
+      const { token, refreshToken } = makeToken(foundID, email)
       const following = await slouch.db.viewArray(
         USERS_DB,
         USERS_DESIGN_DOC,
@@ -169,6 +178,7 @@ export function users (app) {
       )
 
       found.pwResetCode = {NULL: true}
+      found.refreshToken = { S: refreshToken }
       await ddbService.putItem(USERS_TABLE_NAME, found)
       return res.json({
         id: foundID,
@@ -198,12 +208,27 @@ export function users (app) {
     const fcmToken = req.body.token
     const ddbService = new DynamoDBService()
     let found = await ddbService.getItem(FCM_TABLE_NAME, { id: {S: id }})
-    if (found) {
-      found.fcmToken = {S: fcmToken}
-    } else {
-      found = { id: {S: id}, fcmToken: {S: fcmToken}}
+    if (fcmToken) {
+      if (found) {
+        found.fcmToken = {S: fcmToken}
+      } else {
+        found = { id: {S: id}, fcmToken: {S: fcmToken}}
+      }
+      await ddbService.putItem(FCM_TABLE_NAME, found)
     }
-    console.log(found)
+    return res.json({})
+  })
+
+  app.post('/users/setDistribution', authenticator, bodyParser.json(), async (req, res) => {
+    const id = req.body.id
+    const distribution = req.body.distribution
+    const ddbService = new DynamoDBService()
+    let found = await ddbService.getItem(FCM_TABLE_NAME, { id: {S: id }})
+    if (found) {
+      found.distribution = {N: distribution}
+    } else {
+      found = { id: {S: id}, distribution: {N: distribution}}
+    }
     await ddbService.putItem(FCM_TABLE_NAME, found)
     return res.json({})
   })

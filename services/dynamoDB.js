@@ -7,14 +7,14 @@ import {
 
 export default class DynamoDBService {
   constructor (env=configGet(NODE_ENV)) {
-    this.ddb = new aws.DynamoDB()
-    this.ddbDocument = new aws.DynamoDB.DocumentClient();
+    let config
     if (env === 'local') {
-      this.ddb.endpoint = configGet(DYNAMODB_ENDPOINT)
+      config = {endpoint: configGet(DYNAMODB_ENDPOINT)}
     } else {
-      aws.config.update({region: 'us-west-1'});
+      config = {region: 'us-west-1'}
     }
-
+    this.ddb = new aws.DynamoDB(config)
+    this.ddbDocument = new aws.DynamoDB.DocumentClient(config)
   }
 
   async deleteTable(tableName) {

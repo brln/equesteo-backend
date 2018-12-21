@@ -1,3 +1,7 @@
+import jwt from 'jsonwebtoken'
+
+import { configGet, TOP_SECRET_JWT_TOKEN } from "./config"
+
 export function currentTime() {
   const nowTime = new Date
   return ((nowTime.getHours() < 10)?"0":"") + nowTime.getHours() +":"+
@@ -47,9 +51,6 @@ export function staticMap (ride) {
   let fullURL
   while (!lengthURL || lengthURL > 6000) {
     const simplified = simplifyLine(tolerance, toSimplify)
-    console.log(tolerance)
-    console.log('down to:----------------------------------------')
-    console.log(simplified.length)
 
     let pathCoords = ''
     for (let coord of simplified) {
@@ -135,7 +136,7 @@ function simplifyLine (tolerance, points) {
     res.push( points[points.length - 1 ] );
   }
   return res;
-};
+}
 
 
 export function pwResetCode () {
@@ -149,6 +150,16 @@ export function pwResetCode () {
     }
   }
   return text;
+}
+
+export function refreshToken () {
+  let text = ""
+  const possible = "ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890";
+  const codeLength = 24
+  for (let i = 1; i <= codeLength; i++) {
+    text += possible.charAt(Math.floor(Math.random() * possible.length));
+  }
+  return text
 }
 
 export function newRideName (currentRide) {
@@ -172,4 +183,16 @@ export function newRideName (currentRide) {
 
 export const unixTimeNow = () => {
   return Math.floor(new Date().getTime())
+}
+
+export function makeToken (id, email, rt=refreshToken()) {
+  const token = jwt.sign({
+      id,
+      email,
+      createdAt: unixTimeNow(),
+      refreshToken: rt,
+    },
+    configGet(TOP_SECRET_JWT_TOKEN)
+  )
+  return { token, refreshToken: rt }
 }
