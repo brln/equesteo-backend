@@ -5,7 +5,7 @@ import { makeToken, unixTimeNow } from './helpers'
 import DynamoDBService from './services/dynamoDB'
 
 const USERS_TABLE_NAME = 'equesteo_users'
-const TOKEN_EXPIRATION = 30000
+const TOKEN_EXPIRATION = 120000
 const TOKEN_ALLOWED_OVERLAP = 10000
 
 const refreshTokenCache = {}
