@@ -79,13 +79,13 @@ export const authenticator = (req, res, next) => {
           console.log('using an old token!')
           const { token, refreshToken } = makeToken(id, email, foundRefreshToken)
           res.set('x-auth-token', token)
-          setTimeout(() => {
-            found.oldToken = { NULL: true }
-            console.log('clearing old token')
-            ddbService.putItem(USERS_TABLE_NAME, found).then(() => {
-              console.log('old token cleared')
-            }).catch(e => { next(e) })
-          }, TOKEN_ALLOWED_OVERLAP)
+          // setTimeout(() => {
+          //   found.oldToken = { NULL: true }
+          //   console.log('clearing old token')
+          //   ddbService.putItem(USERS_TABLE_NAME, found).then(() => {
+          //     console.log('old token cleared')
+          //   }).catch(e => { next(e) })
+          // }, TOKEN_ALLOWED_OVERLAP)
           next()
         } else {
           console.log('attempted auth with expired token')
