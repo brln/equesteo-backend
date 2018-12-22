@@ -19,6 +19,7 @@ import {
   COUCH_USERNAME,
   ELASTICSEARCH_HOST,
   GCM_API_KEY,
+  LOGGING_TYPE,
   NODE_ENV,
 } from "./config"
 import { postRide } from './controllers/gpxUploader'
@@ -26,14 +27,14 @@ import { couchProxy } from './controllers/couchProxy'
 import { users } from './controllers/users'
 import { createUsersDesignDoc, USERS_DB } from "./design_docs/users"
 import { createHorsesDesignDoc, HORSES_DB } from "./design_docs/horses"
-import { createRidesDesignDoc, RIDES_DB, RIDES_DESIGN_DOC } from './design_docs/rides'
+import { createRidesDesignDoc, RIDES_DB } from './design_docs/rides'
 
 import startRideChangeIterator from './ChangeIterators/rides'
 import startUsersChangeIterator from './ChangeIterators/users'
 import DynamoDBService from './services/dynamoDB'
 
 const app = express()
-app.use(logger('dev'))
+app.use(logger(configGet(LOGGING_TYPE)))
 
 if (configGet(NODE_ENV) !== 'local') {
   Sentry.init({dsn: 'https://04b0f2944b3d43af8fc7d039a8bb6359@sentry.io/1305626'});
