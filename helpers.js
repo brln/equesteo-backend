@@ -185,7 +185,8 @@ export const unixTimeNow = () => {
   return Math.floor(new Date().getTime())
 }
 
-export function makeToken (id, email, rt=refreshToken()) {
+export function makeToken (id, email) {
+  const rt = refreshToken()
   const token = jwt.sign({
       id,
       email,
