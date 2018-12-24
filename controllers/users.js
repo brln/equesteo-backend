@@ -47,6 +47,7 @@ export function users (app) {
       const { token, refreshToken } = makeToken(foundID, email)
 
       found.refreshToken = {S: refreshToken}
+      found.nextToken = {S:token}
       try {
         await ddbService.putItem(USERS_TABLE_NAME, found)
       } catch (e) {
@@ -114,7 +115,8 @@ export function users (app) {
           password: {S: hashed},
           id: {S: newUser.id},
           enabled: {BOOL: true},
-          refreshToken: {S: refreshToken}
+          refreshToken: {S: refreshToken},
+          nextToken: {S:token}
         }).then(() => {
           console.log('ddb record created')
           res.set('x-auth-token', token).json({
@@ -179,6 +181,7 @@ export function users (app) {
 
       found.pwResetCode = {NULL: true}
       found.refreshToken = { S: refreshToken }
+      found.nextToken = {S: token}
       await ddbService.putItem(USERS_TABLE_NAME, found)
       return res.json({
         id: foundID,

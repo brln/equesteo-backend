@@ -9,6 +9,7 @@ const TOKEN_EXPIRATION = 120000
 const TOKEN_ALLOWED_OVERLAP = 10000
 
 const refreshTokenCache = {}
+const clearOldTokenTimeouts = {}
 
 export const authenticator = (req, res, next) => {
   const authHeader = req.headers.authorization
@@ -47,6 +48,7 @@ export const authenticator = (req, res, next) => {
         }
 
         const foundRefreshToken = found.refreshToken.S
+        const foundNextToken = found.nextToken.S
         const foundOldToken = found.oldToken ? found.oldToken.S : null
 
         if (incomingRefreshToken === foundRefreshToken) {
@@ -64,6 +66,7 @@ export const authenticator = (req, res, next) => {
             res.set('x-auth-token', token)
             found.refreshToken = { S: refreshToken }
             found.oldToken = { S: foundRefreshToken }
+            found.nextToken = { S: token }
             ddbService.putItem(USERS_TABLE_NAME, found).then(() => {
               delete refreshTokenCache[incomingRefreshToken]
               next()
@@ -77,15 +80,18 @@ export const authenticator = (req, res, next) => {
           // earlier ones did. This old token can be used for TOKEN_ALLOWED_OVERLAP
           // seconds after the first time it's used, then is destroyed.
           console.log('using an old token!')
-          const { token, refreshToken } = makeToken(id, email, foundRefreshToken)
-          res.set('x-auth-token', token)
-          // setTimeout(() => {
-          //   found.oldToken = { NULL: true }
-          //   console.log('clearing old token')
-          //   ddbService.putItem(USERS_TABLE_NAME, found).then(() => {
-          //     console.log('old token cleared')
-          //   }).catch(e => { next(e) })
-          // }, TOKEN_ALLOWED_OVERLAP)
+          res.set('x-auth-token', foundNextToken)
+          if (!clearOldTokenTimeouts[incomingRefreshToken]) {
+            clearOldTokenTimeouts[incomingRefreshToken] = setTimeout(() => {
+              found.oldToken = { NULL: true }
+              found.nextToken = { NULL: true }
+              console.log('clearing old token')
+              ddbService.putItem(USERS_TABLE_NAME, found).then(() => {
+                delete clearOldTokenTimeouts[incomingRefreshToken]
+                console.log('old token cleared')
+              }).catch(e => { next(e) })
+            }, TOKEN_ALLOWED_OVERLAP)
+          }
           next()
         } else {
           console.log('attempted auth with expired token')

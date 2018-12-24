@@ -18,7 +18,45 @@ export default function startRideChangeIterator(slouch, gcmClient, ddbService) {
     console.log('ride change iterator running')
     newRideNotification(rideRecord, slouch, gcmClient, ddbService)
     newCommentNotification(rideRecord, slouch, gcmClient, ddbService)
+    newCarrotNotification(rideRecord, slouch, gcmClient, ddbService)
   })
+}
+
+function newCarrotNotification(carrotRecord, slouch, gcmClient, ddbService) {
+  if (carrotRecord.doc && carrotRecord.doc.type === 'carrot'
+    && carrotRecord.doc._rev.split('-')[0] === '1') {
+      slouch.doc.get(RIDES_DB, carrotRecord.doc.rideID, {include_docs: true}).then(ride => {
+        if (carrotRecord.doc.userID !== ride.userID) {
+          slouch.doc.get(USERS_DB, ride.userID).then(foundUser => {
+            ddbService.getItem(TABLE_NAME, {id: {S: foundUser._id}}).then(ddbUser => {
+              if (ddbUser && ddbUser.fcmToken) {
+                const message = new gcm.Message({
+                  data: {
+                    type: 'newCarrot',
+                    carrotRideID: carrotRecord.doc.rideID,
+                    carroterName: `${foundUser.firstName} ${foundUser.lastName}`,
+                  },
+                  priority: 'high'
+                });
+                gcmClient.send(
+                  message,
+                  {registrationTokens: [ddbUser.fcmToken.S]},
+                  (err, response) => {
+                    if (err) {
+                      console.log(err)
+                      throw err
+                    } else {
+                      console.log('FCM send response: ============')
+                      console.log(response);
+                    }
+                  }
+                );
+              }
+            })
+          })
+        }
+      })
+  }
 }
 
 function newRideNotification (rideRecord, slouch, gcmClient, ddbService) {
