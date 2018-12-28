@@ -36,6 +36,13 @@ export function createRidesDesignDoc (slouch) {
             }
           }.toString()
         },
+        rideHorsesByRide: {
+          map: function (doc) {
+            if (doc.type === 'rideHorse' && doc.deleted !== true) {
+              emit(doc.rideID, null)
+            }
+          }.toString()
+        },
       },
       filters: {
         byUserIDs: function (doc, req) {

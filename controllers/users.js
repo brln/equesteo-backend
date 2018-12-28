@@ -89,6 +89,7 @@ export function users (app) {
     }
     const hashed = bcrypt.hashSync(password, bcrypt.genSaltSync(10));
 
+    let newUser
     slouch.doc.create(USERS_DB, {
       firstName: null,
       lastName: null,
@@ -99,8 +100,20 @@ export function users (app) {
       type: 'user',
       createTime: unixTimeNow(),
       finishedFirstStart: false
-    }).then(newUser => {
+    }).then(newUserRecord => {
       console.log('new user created')
+      newUser = newUserRecord
+      const newTraining = {
+        "_id": `${newUser.id}_training`,
+        "rides": [],
+        "userID": newUser.id,
+        "lastUpdate": unixTimeNow(),
+        "type": "training"
+      }
+      console.log(newTraining)
+      return slouch.doc.create(USERS_DB, newTraining)
+    }).then(() => {
+      console.log('training record created')
       return slouch.doc.create(USERS_DB, {
         "_id": `${newUser.id}_${configGet(NICOLE_USER_ID)}`,
         "followingID": configGet(NICOLE_USER_ID),

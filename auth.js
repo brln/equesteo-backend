@@ -47,7 +47,7 @@ export const authenticator = (req, res, next) => {
           return res.status(401).json({error: 'Account is disabled.'})
         }
 
-        const foundRefreshToken = found.refreshToken.S
+        const foundRefreshToken = found.refreshToken ? found.refreshToken.S : null
         const foundNextToken = found.nextToken.S
         const foundOldToken = found.oldToken ? found.oldToken.S : null
 
