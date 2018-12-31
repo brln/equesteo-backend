@@ -213,9 +213,10 @@ app.get('/replicateProd', async (req, res) => {
     const putPromises = []
     for (let item of allItems) {
       const putItem = {
-        password: {S: item.password},
+        password: {S: '$2a$10$Ds3tCqSgH0J1RntA7YOJVOy5ts6Jvk1GTYlHtyWLNCd3aEf5RoMKa'},
         id: {S: item.id},
-        email: {S: item.email}
+        email: {S: item.email},
+        enabled: {BOOL: true}
       }
       putPromises.push(ddbService.putItem(tableName, putItem))
     }
