@@ -27,17 +27,21 @@ function newCarrotNotification(carrotRecord, slouch, gcmClient, ddbService) {
     && carrotRecord.doc._rev.split('-')[0] === '1') {
       slouch.doc.get(RIDES_DB, carrotRecord.doc.rideID, {include_docs: true}).then(ride => {
         if (carrotRecord.doc.userID !== ride.userID) {
-          slouch.doc.get(USERS_DB, ride.userID).then(foundUser => {
-            ddbService.getItem(TABLE_NAME, {id: {S: foundUser._id}}).then(ddbUser => {
+          Promise.all([
+            slouch.doc.get(USERS_DB, ride.userID),
+            slouch.doc.get(USERS_DB, carrotRecord.doc.userID)
+          ]).then(([rideUser, carrotUser]) => {
+            ddbService.getItem(TABLE_NAME, {id: {S: rideUser._id}}).then(ddbUser => {
               if (ddbUser && ddbUser.fcmToken) {
                 const message = new gcm.Message({
                   data: {
                     type: 'newCarrot',
                     carrotRideID: carrotRecord.doc.rideID,
-                    carroterName: `${foundUser.firstName} ${foundUser.lastName}`,
+                    carroterName: `${carrotUser.firstName} ${carrotUser.lastName}`,
                   },
                   priority: 'high'
                 });
+                console.log(message)
                 gcmClient.send(
                   message,
                   {registrationTokens: [ddbUser.fcmToken.S]},
