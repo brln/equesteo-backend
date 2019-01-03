@@ -183,7 +183,7 @@ export function users (app) {
       found.refreshToken = { S: refreshToken }
       found.nextToken = {S: token}
       await ddbService.putItem(USERS_TABLE_NAME, found)
-      return res.json({
+      return res.set('x-auth-token', token).json({
         id: foundID,
         following:  following.rows.map(f => f.value),
         followers: followers.rows.map(f => f.value),

@@ -15,11 +15,15 @@ export default class EmailerService {
     const b64email = Buffer.from(email).toString('base64')
     const msg = {
       to: email,
-      from: 'donotreply@equesteo.com',
+      from: 'info@equesteo.com',
       subject: 'Your Password Reset Code',
-      text: token,
-      html: `Your code is: <a href="equesteo://forgotpw?t=${downcase}&e=${b64email}">${token}</a>`,
-    };
+      text: `Your password reset code is: ${token}. Please contact us if you have any problems. info@equesteo.com`,
+      templateId: 'd-6d31a5baf5ab4e6681b7a3e80f5e7be7',
+      dynamic_template_data: {
+        token: token,
+        link: `equesteo://forgotpw?t=${downcase}&e=${b64email}`
+      }
+    }
     if (process.env.NODE_ENV === 'production') {
       await sgMail.send(msg);
     } else {
