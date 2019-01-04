@@ -75,8 +75,8 @@ const gcmClient = new gcm.Sender(configGet(GCM_API_KEY));
 const ddbService = new DynamoDBService()
 
 
-startUsersChangeIterator(ESClient, slouch)
-startRideChangeIterator(slouch, gcmClient, ddbService)
+// startUsersChangeIterator(ESClient, slouch)
+// startRideChangeIterator(slouch, gcmClient, ddbService)
 
 
 app.get('/errorTest', (req, res) => {
@@ -150,6 +150,43 @@ app.get('/users/search', authenticator, async (req, res) => {
   return res.json(docs)
 })
 
+app.get('/createRideHorsesForAll', (req, res, next) => {
+  new Promise((resolve, reject) => {
+    const updates = []
+    slouch.db.view(RIDES_DB, RIDES_DESIGN_DOC, 'ridesByID', {include_docs: true}).each(ride => {
+      if (ride.doc.horseID) {
+        const rideHorses = []
+        return slouch.db.view(RIDES_DB, RIDES_DESIGN_DOC, 'rideHorsesByRide', {include_docs: true, key: `"${ride.doc._id}"`}).each(rideHorse => {
+          rideHorses.push(rideHorse.doc.horseID)
+        }).then(() => {
+          if (rideHorses.length === 0) {
+            const recordID = `${ride.doc._id}_${ride.doc.horseID}_${'rider'}`
+            const newRideHorse = {
+              _id: recordID,
+              rideID: ride.doc._id,
+              horseID: ride.doc.horseID,
+              rideHorseType: 'rider',
+              type: 'rideHorse',
+              timestamp: unixTimeNow(),
+              userID: ride.doc.userID,
+            }
+            updates.push(slouch.doc.create(RIDES_DB, newRideHorse))
+          }
+          delete ride.doc.horseID
+          updates.push(slouch.doc.update(RIDES_DB, ride.doc))
+        })
+      }
+    }).then(() => {
+      return Promise.all(updates)
+    }).then(() => {
+      resolve()
+    })
+  }).then(() => {
+    res.json('done')
+  }).catch(e => {
+    next(e)
+  })
+})
 
 app.get('/replicateProd', async (req, res) => {
   if (configGet(NODE_ENV) !== 'local') {
