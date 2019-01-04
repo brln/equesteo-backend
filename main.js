@@ -24,10 +24,11 @@ import {
 } from "./config"
 import { postRide } from './controllers/gpxUploader'
 import { couchProxy } from './controllers/couchProxy'
+import { unixTimeNow } from './helpers'
 import { users } from './controllers/users'
 import { createUsersDesignDoc, USERS_DB } from "./design_docs/users"
 import { createHorsesDesignDoc, HORSES_DB } from "./design_docs/horses"
-import { createRidesDesignDoc, RIDES_DB } from './design_docs/rides'
+import { createRidesDesignDoc, RIDES_DB, RIDES_DESIGN_DOC } from './design_docs/rides'
 
 import startRideChangeIterator from './ChangeIterators/rides'
 import startUsersChangeIterator from './ChangeIterators/users'
@@ -180,6 +181,8 @@ app.get('/createRideHorsesForAll', (req, res, next) => {
       return Promise.all(updates)
     }).then(() => {
       resolve()
+    }).catch(e => {
+      reject(e)
     })
   }).then(() => {
     res.json('done')
