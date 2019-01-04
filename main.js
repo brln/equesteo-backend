@@ -24,7 +24,6 @@ import {
 } from "./config"
 import { postRide } from './controllers/gpxUploader'
 import { couchProxy } from './controllers/couchProxy'
-import { unixTimeNow } from './helpers'
 import { users } from './controllers/users'
 import { createUsersDesignDoc, USERS_DB } from "./design_docs/users"
 import { createHorsesDesignDoc, HORSES_DB } from "./design_docs/horses"
@@ -76,8 +75,8 @@ const gcmClient = new gcm.Sender(configGet(GCM_API_KEY));
 const ddbService = new DynamoDBService()
 
 
-// startUsersChangeIterator(ESClient, slouch)
-// startRideChangeIterator(slouch, gcmClient, ddbService)
+startUsersChangeIterator(ESClient, slouch)
+startRideChangeIterator(slouch, gcmClient, ddbService)
 
 
 app.get('/errorTest', (req, res) => {
