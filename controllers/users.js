@@ -206,33 +206,47 @@ export function users (app) {
     return res.json({})
   })
 
-  app.post('/users/setFCMToken', authenticator, bodyParser.json(), async (req, res) => {
+  app.post('/users/setFCMToken', authenticator, bodyParser.json(), (req, res, next) => {
     const id = req.body.id
     const fcmToken = req.body.token
     const ddbService = new DynamoDBService()
-    let found = await ddbService.getItem(FCM_TABLE_NAME, { id: {S: id }})
-    if (fcmToken) {
-      if (found) {
-        found.fcmToken = {S: fcmToken}
-      } else {
-        found = { id: {S: id}, fcmToken: {S: fcmToken}}
-      }
-      await ddbService.putItem(FCM_TABLE_NAME, found)
+    if (fcmToken && id) {
+      ddbService.getItem(FCM_TABLE_NAME, { id: {S: id }}).then(found => {
+        if (found) {
+          found.fcmToken = {S: fcmToken}
+        } else {
+          found = { id: {S: id}, fcmToken: {S: fcmToken}}
+        }
+        return ddbService.putItem(FCM_TABLE_NAME, found).then(() => {
+          return res.json({})
+        })
+      }).catch(e => {
+        next(e)
+      })
+    } else {
+      return res.status(400)
     }
-    return res.json({})
   })
 
-  app.post('/users/setDistribution', authenticator, bodyParser.json(), async (req, res) => {
+  app.post('/users/setDistribution', authenticator, bodyParser.json(), (req, res, next) => {
     const id = req.body.id
     const distribution = req.body.distribution
     const ddbService = new DynamoDBService()
-    let found = await ddbService.getItem(FCM_TABLE_NAME, { id: {S: id }})
-    if (found) {
-      found.distribution = {N: distribution}
+    if (distribution && id) {
+      ddbService.getItem(FCM_TABLE_NAME, { id: {S: id }}).then(found => {
+        if (found) {
+          found.distribution = {N: distribution}
+        } else {
+          found = { id: {S: id}, distribution: {N: distribution}}
+        }
+        return ddbService.putItem(FCM_TABLE_NAME, found).then(() => {
+          return res.json({})
+        })
+      }).catch(e => {
+        next(e)
+      })
     } else {
-      found = { id: {S: id}, distribution: {N: distribution}}
+      return res.status(400)
     }
-    await ddbService.putItem(FCM_TABLE_NAME, found)
-    return res.json({})
   })
 }
