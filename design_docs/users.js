@@ -6,27 +6,54 @@ export function createUsersDesignDoc (slouch) {
     slouch.doc.createOrUpdate(USERS_DB, {
       _id: USERS_DESIGN_DOC,
       views: {
+        byID: {
+          map: function (doc) {
+            if (doc.type === "user") {
+              emit(doc._id, null)
+            }
+          } .toString()
+        },
         by_email: {
           map: function (doc) { emit(doc.email, doc.password); }.toString()
         },
         following: {
           map: function (doc) {
-            if( doc.type === 'follow') {
-              emit( doc.followerID, doc.followingID );
+            if (doc.type === 'follow') {
+              emit(doc.followerID, doc.followingID);
             }
           }.toString()
         },
         followers: {
           map: function (doc) {
-            if( doc.type === 'follow') {
-              emit( doc.followingID, {_id: doc.followerID} );
+            if (doc.type === 'follow') {
+              emit(doc.followingID, doc.followerID );
             }
           }.toString()
-        }
+        },
+        trainingsByUserID: {
+          map: function (doc) {
+            if (doc.type === 'training') {
+              emit(doc.userID, null)
+            }
+          }.toString()
+        },
+        trainingsByRideID: {
+          map: function (doc) {
+            if (doc.type === 'training') {
+              for (let i = 0; i < doc.rides.length; i++) {
+                emit(doc.rides[i].rideID, i)
+              }
+            }
+          }.toString()
+        },
       },
       filters: {
         byUserIDs: function (doc, req) {
-          return true
+          if (doc.type === 'training' && doc.userID === req.query.ownUserID) {
+            return true
+          } else if (doc.type === 'user' || doc.type === 'follow') {
+            return true
+          }
         }.toString()
       }
     })

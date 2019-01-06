@@ -25,7 +25,6 @@ export default function startUsersChangeIterator (ESClient, slouch) {
           doc_as_upsert: true,
         },
         id: item.doc._id,
-
       })
     }
     if (item.deleted) {

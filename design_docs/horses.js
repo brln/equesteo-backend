@@ -6,6 +6,20 @@ export function createHorsesDesignDoc (slouch) {
     slouch.doc.createOrUpdate(HORSES_DB, {
       _id: HORSES_DESIGN_DOC,
       views: {
+        horseUsersByUserID: {
+          map: function (doc) {
+            if (doc.type === 'horseUser') {
+              emit(doc.userID, null)
+            }
+          }.toString()
+        },
+        horseUsersByHorseID: {
+          map: function (doc) {
+            if (doc.type === 'horseUser') {
+              emit(doc.horseID, doc._id)
+            }
+          }.toString()
+        },
         allJoins: {
           map: function (doc) {
             if (doc.type === 'horseUser' || doc.type === 'horsePhoto') {

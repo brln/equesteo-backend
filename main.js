@@ -24,6 +24,7 @@ import {
 } from "./config"
 import { postRide } from './controllers/gpxUploader'
 import { couchProxy } from './controllers/couchProxy'
+import { haversine } from './helpers'
 import { users } from './controllers/users'
 import { createUsersDesignDoc, USERS_DB } from "./design_docs/users"
 import { createHorsesDesignDoc, HORSES_DB } from "./design_docs/horses"
@@ -150,6 +151,78 @@ app.get('/users/search', authenticator, async (req, res) => {
   return res.json(docs)
 })
 
+app.get('/fixElevations', (req, res) => {
+  function metersToFeet (meters) {
+    return meters * 3.28084
+  }
+
+  function newElevationGain (distance, lastElevation, newElevation, oldTotal) {
+    let newTotal = oldTotal
+    const diff = metersToFeet(Math.abs(newElevation - lastElevation))
+    if (diff) {
+      const grade = diff / (distance * 5280)
+      if (grade < 0.5) {
+        const elevationChange = newElevation - lastElevation
+        newTotal = oldTotal + (elevationChange > 0 ? elevationChange : 0)
+      }
+    }
+    return newTotal
+  }
+
+  function parseElevationData (rideCoordinates, rideElevations) {
+    let totalGain = 0
+    let lastPoint = null
+
+    for (let rideCoord of rideCoordinates.rideCoordinates) {
+      const latEl = rideElevations.elevations[rideCoord[0].toFixed(4)]
+      const elevation = latEl ? latEl[rideCoord[1].toFixed(4)] : null
+      if (elevation) {
+        if (lastPoint) {
+          const newDistance = haversine(
+            lastPoint[0],
+            lastPoint[1],
+            rideCoord[0],
+            rideCoord[1]
+          )
+
+          const lastElevation = rideElevations.elevations[lastPoint[0].toFixed(4)][lastPoint[1].toFixed(4)]
+          totalGain = newElevationGain(newDistance, lastElevation, elevation, totalGain)
+        }
+        lastPoint = rideCoord
+      }
+    }
+    return totalGain
+  }
+
+  const rides = {}
+  const rideCoordinates = {}
+  const rideElevations = {}
+  slouch.db.view(RIDES_DB, RIDES_DESIGN_DOC, 'rideData', {include_docs: true}).each(doc => {
+    if (doc.doc.type === 'ride') {
+      rides[doc.doc._id] = doc.doc
+    } else if (doc.doc.type === 'rideElevations') {
+      rideElevations[doc.doc._id] = doc.doc
+    } else if (doc.doc.type === 'rideCoordinates') {
+      rideCoordinates[doc.doc._id] = doc.doc
+    }
+  }).then(() => {
+    const docUpdates = []
+    for (let rideID of Object.keys(rides)) {
+      console.log(rideID)
+      const coords = rideCoordinates[rideID + '_coordinates']
+      const elevations = rideElevations[rideID + '_elevations']
+      if (elevations) {
+        const gain = parseElevationData(coords, elevations)
+        const newDoc = Object.assign({}, elevations, {elevationGain: gain})
+        docUpdates.push(slouch.doc.upsert(RIDES_DB, newDoc))
+      }
+    }
+    return Promise.all(docUpdates)
+  }).then(() => {
+    res.sendStatus(200)
+  })
+})
+
 app.get('/replicateProd', async (req, res) => {
   if (configGet(NODE_ENV) !== 'local') {
     return res.json({'not for': "you"})
@@ -215,7 +288,8 @@ app.get('/replicateProd', async (req, res) => {
         password: {S: '$2a$10$Ds3tCqSgH0J1RntA7YOJVOy5ts6Jvk1GTYlHtyWLNCd3aEf5RoMKa'},
         id: {S: item.id},
         email: {S: item.email},
-        enabled: {BOOL: true}
+        enabled: {BOOL: true},
+        refreshToken: {NULL: true}
       }
       putPromises.push(ddbService.putItem(tableName, putItem))
     }
