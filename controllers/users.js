@@ -47,7 +47,7 @@ export function users (app) {
       const { token, refreshToken } = makeToken(foundID, email)
 
       found.refreshToken = {S: refreshToken}
-      found.nextToken = {S:token}
+      found.nextToken = {S: token}
       try {
         await ddbService.putItem(USERS_TABLE_NAME, found)
       } catch (e) {

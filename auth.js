@@ -51,6 +51,9 @@ export const authenticator = (req, res, next) => {
         const foundNextToken = found.nextToken.S
         const foundOldToken = found.oldToken ? found.oldToken.S : null
 
+        console.log('incoming: ' + incomingRefreshToken)
+        console.log('found: ' + foundRefreshToken)
+        console.log('found old: ' + foundOldToken)
         if (incomingRefreshToken === foundRefreshToken) {
           // Using the most recent refresh token
           if (refreshTokenCache[incomingRefreshToken]) {
@@ -70,7 +73,7 @@ export const authenticator = (req, res, next) => {
             ddbService.putItem(USERS_TABLE_NAME, found).then(() => {
               delete refreshTokenCache[incomingRefreshToken]
               next()
-            })
+            }).catch(e => { next(e) })
           }
         } else if (incomingRefreshToken === foundOldToken) {
           // Using the most recently expired token, but that has to be
@@ -83,12 +86,14 @@ export const authenticator = (req, res, next) => {
           res.set('x-auth-token', foundNextToken)
           if (!clearOldTokenTimeouts[incomingRefreshToken]) {
             clearOldTokenTimeouts[incomingRefreshToken] = setTimeout(() => {
-              found.oldToken = { NULL: true }
-              found.nextToken = { NULL: true }
               console.log('clearing old token')
-              ddbService.putItem(USERS_TABLE_NAME, found).then(() => {
-                delete clearOldTokenTimeouts[incomingRefreshToken]
-                console.log('old token cleared')
+              ddbService.getItem(USERS_TABLE_NAME, { email: {S: email }}).then(foundAgain => {
+                foundAgain.oldToken = { NULL: true }
+                foundAgain.nextToken = { NULL: true }
+                return ddbService.putItem(USERS_TABLE_NAME, found).then(() => {
+                  delete clearOldTokenTimeouts[incomingRefreshToken]
+                  console.log('old token cleared')
+                })
               }).catch(e => { next(e) })
             }, TOKEN_ALLOWED_OVERLAP)
           }
