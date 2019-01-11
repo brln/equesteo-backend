@@ -74,7 +74,6 @@ router.post('/login', async (req, res, next) => {
       'followers',
       { key: `"${foundID}"`}
     )
-    console.log(token)
     res.set('x-auth-token', token).json({
       id: foundID,
       token, // remove this when everyone is on > 0.45.0
