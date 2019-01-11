@@ -267,3 +267,150 @@ app.get('/createRideHorsesForAll', (req, res, next) => {
     next(e)
   })
 })
+
+export function postRide (app) {
+  const upload = multer({ storage: multer.memoryStorage() })
+  const METERS_TO_FEET = 3.28084
+  app.post("/gpxUploader", authenticator, upload.single('file'), (req, resp) => {
+    let fileBuffer = req.file.buffer
+    xml2js.parseString(fileBuffer, (err, res) => {
+      const points = res.gpx.trk[0].trkseg[0].trkpt
+      const parsedPoints = []
+      const parsedElevations = {}
+      let distance = 0
+      let gain = 0
+
+      let lastPoint = null
+      let lastElevation = null
+      let startTime = null
+      let lastTime = null
+      for (let point of points) {
+        const timestamp = Date.parse(point.time[0])
+        if (!lastTime || timestamp > lastTime) {
+          lastTime = timestamp
+        }
+        const lat = parseFloat(point.$.lat)
+        const long = parseFloat(point.$.lon)
+        const elevation = parseFloat(point.ele[0]) * METERS_TO_FEET
+        startTime = startTime ? startTime : timestamp
+        if (lastPoint) {
+          distance += haversine(lastPoint.lat, lastPoint.long, lat, long)
+          gain += elevation - lastElevation > 0 ? elevation - lastElevation : 0
+        }
+        lastPoint = { lat, long }
+        lastElevation = elevation
+        parsedPoints.push({
+          latitude: lat,
+          longitude: long,
+          accuracy: null,
+          timestamp,
+        })
+
+        if (!parsedElevations[lat.toFixed(4)]) {
+          parsedElevations[lat.toFixed(4)] = {}
+        }
+        parsedElevations[lat.toFixed(4)][long.toFixed(4)] = Math.round(elevation)
+      }
+
+      const rideID = `${resp.locals.userID}_${(new Date).getTime().toString()}`
+      const ride = {
+        _id: rideID,
+        coverPhotoID: null,
+        distance,
+        elapsedTimeSecs: (lastTime - startTime) / 1000,
+        rideCoordinates: parsedPoints,
+        photosByID: {},
+        startTime,
+        type: 'ride',
+        userID: resp.locals.userID,
+        isPublic: false,
+      }
+      ride.name = newRideName(ride)
+      ride.mapURL = staticMap(ride)
+      slouch.doc.create(RIDES_DB, ride)
+      const rideElevations = {
+        _id: rideID + '_elevations',
+        rideID: rideID,
+        elevationGain: gain,
+        elevations: parsedElevations,
+        type: 'rideElevations',
+        userID: resp.locals.userID,
+      }
+      slouch.doc.create(RIDES_DB, rideElevations)
+    })
+
+    return resp.json({})
+  })
+}
+
+app.get('/fixElevations', (req, res) => {
+  function metersToFeet (meters) {
+    return meters * 3.28084
+  }
+
+  function newElevationGain (distance, lastElevation, newElevation, oldTotal) {
+    let newTotal = oldTotal
+    const diff = metersToFeet(Math.abs(newElevation - lastElevation))
+    if (diff) {
+      const grade = diff / (distance * 5280)
+      if (grade < 0.5) {
+        const elevationChange = newElevation - lastElevation
+        newTotal = oldTotal + (elevationChange > 0 ? elevationChange : 0)
+      }
+    }
+    return newTotal
+  }
+
+  function parseElevationData (rideCoordinates, rideElevations) {
+    let totalGain = 0
+    let lastPoint = null
+
+    for (let rideCoord of rideCoordinates.rideCoordinates) {
+      const latEl = rideElevations.elevations[rideCoord[0].toFixed(4)]
+      const elevation = latEl ? latEl[rideCoord[1].toFixed(4)] : null
+      if (elevation) {
+        if (lastPoint) {
+          const newDistance = haversine(
+            lastPoint[0],
+            lastPoint[1],
+            rideCoord[0],
+            rideCoord[1]
+          )
+
+          const lastElevation = rideElevations.elevations[lastPoint[0].toFixed(4)][lastPoint[1].toFixed(4)]
+          totalGain = newElevationGain(newDistance, lastElevation, elevation, totalGain)
+        }
+        lastPoint = rideCoord
+      }
+    }
+    return totalGain
+  }
+
+  const rides = {}
+  const rideCoordinates = {}
+  const rideElevations = {}
+  slouch.db.view(RIDES_DB, RIDES_DESIGN_DOC, 'rideData', {include_docs: true}).each(doc => {
+    if (doc.doc.type === 'ride') {
+      rides[doc.doc._id] = doc.doc
+    } else if (doc.doc.type === 'rideElevations') {
+      rideElevations[doc.doc._id] = doc.doc
+    } else if (doc.doc.type === 'rideCoordinates') {
+      rideCoordinates[doc.doc._id] = doc.doc
+    }
+  }).then(() => {
+    const docUpdates = []
+    for (let rideID of Object.keys(rides)) {
+      console.log(rideID)
+      const coords = rideCoordinates[rideID + '_coordinates']
+      const elevations = rideElevations[rideID + '_elevations']
+      if (elevations) {
+        const gain = parseElevationData(coords, elevations)
+        const newDoc = Object.assign({}, elevations, {elevationGain: gain})
+        docUpdates.push(slouch.doc.upsert(RIDES_DB, newDoc))
+      }
+    }
+    return Promise.all(docUpdates)
+  }).then(() => {
+    res.sendStatus(200)
+  })
+})

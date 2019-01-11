@@ -41,14 +41,12 @@ class TrainingCache {
   }
 
   static updateOrInvalidate(training) {
-    console.log('invalidating')
     if (cacheRefs[training.doc._id] === 1) {
       delete trainingCache[training.doc._id]
       delete cacheRefs[training.doc._id]
     } else if (cacheRefs[training.doc._id] > 1) {
       cacheRefs[training.doc._id] = cacheRefs[training.doc._id] - 1
     }
-    console.log(cacheRefs)
   }
 }
 

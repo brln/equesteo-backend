@@ -21,3 +21,10 @@ Pre - install openSSH when installing ubuntu, forward port 4022, `ssh equesteo@l
 7. `$ sysctl -w vm.max_map_count=262144`
 8. In your /etc/elasticsearch/elasticsearch.yml configuration file set network.host: 0.0.0.0
 9. `$ ./elasticsearch`
+
+# Installing production couchdb
+1. Use Ubuntu 16 (1/7/18) because dependencies are broken on 18
+2. Add "deb https://apache.bintray.com/couchdb-deb xenial main" to /etc/apt/sources.list 
+3. `curl -L https://couchdb.apache.org/repo/bintray-pubkey.asc \
+    | sudo apt-key add -`
+4. `sudo apt-get update && sudo apt-get install couchdb`

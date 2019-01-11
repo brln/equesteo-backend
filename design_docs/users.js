@@ -46,6 +46,13 @@ export function createUsersDesignDoc (slouch) {
             }
           }.toString()
         },
+        userPhotos: {
+          map: function (doc) {
+            if (doc.type === 'userPhoto') {
+              emit(doc._id, null)
+            }
+          } .toString()
+        },
       },
       filters: {
         byUserIDs: function (doc, req) {

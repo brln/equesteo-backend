@@ -1,10 +1,8 @@
 import aws from 'aws-sdk'
 import express from 'express'
+import fetch from 'node-fetch'
 import gcm from 'node-gcm'
 import logger from 'morgan'
-import multer from 'multer'
-import multerS3 from 'multer-s3'
-import path from 'path'
 import Slouch from 'couch-slouch'
 import elasticsearch from 'elasticsearch'
 import * as Sentry from '@sentry/node'
@@ -22,13 +20,11 @@ import {
   LOGGING_TYPE,
   NODE_ENV,
 } from "./config"
-import { postRide } from './controllers/gpxUploader'
-import { couchProxy } from './controllers/couchProxy'
-import { haversine } from './helpers'
-import { users } from './controllers/users'
-import { createUsersDesignDoc, USERS_DB } from "./design_docs/users"
-import { createHorsesDesignDoc, HORSES_DB } from "./design_docs/horses"
+import { couchProxyRouter, photosRouter, usersRouter } from './controllers'
+import { createUsersDesignDoc, USERS_DB, USERS_DESIGN_DOC } from "./design_docs/users"
+import { createHorsesDesignDoc, HORSES_DB, HORSES_DESIGN_DOC } from "./design_docs/horses"
 import { createRidesDesignDoc, RIDES_DB, RIDES_DESIGN_DOC } from './design_docs/rides'
+import PhotoUploader from './services/PhotoUploader'
 
 import startRideChangeIterator from './ChangeIterators/rides'
 import startUsersChangeIterator from './ChangeIterators/users'
@@ -42,8 +38,6 @@ if (configGet(NODE_ENV) !== 'local') {
   app.use(Sentry.Handlers.requestHandler());
 }
 
-const s3 = new aws.S3()
-
 aws.config.update({
   secretAccessKey: configGet(AWS_SECRET_ACCESS_KEY),
   accessKeyId: configGet(AWS_ACCESS_KEY_ID),
@@ -51,21 +45,60 @@ aws.config.update({
 });
 
 app.use(express.static('static'))
-app.use("/gpxUploader", express.static(path.join(__dirname, 'frontend', 'build')))
 
-const INQUIRIES_DB = 'inquiries'
 const slouch = new Slouch(
   `http://${configGet(COUCH_USERNAME)}:${configGet(COUCH_PASSWORD)}@${configGet(COUCH_HOST)}`
 );
-slouch.db.create(INQUIRIES_DB)
 createUsersDesignDoc(slouch)
 createHorsesDesignDoc(slouch)
 createRidesDesignDoc(slouch)
 
+app.get('/resizeAllImages', (req, res) => {
+  function uploadPhoto (photo, bucket) {
+    const splitup = photo.doc.uri.split('/')
+    const filename = splitup[splitup.length - 1]
+    return new Promise((res, rej) => {
+      fetch(photo.doc.uri).then(res => {
+        return res.buffer()
+      }).then(buffer => {
+        return PhotoUploader.uploadPhoto(buffer, filename, bucket)
+      }).then(() => {
+        res()
+      }).catch(e => {
+        rej(e)
+      })
+    })
+  }
+
+  slouch.db.view(USERS_DB, USERS_DESIGN_DOC, 'userPhotos', {include_docs: true}).each(userPhoto => {
+    if (userPhoto.doc.uri.startsWith('https://')) {
+      return uploadPhoto(userPhoto, 'equesteo-profile-photos-3').catch(e => { console.log(userPhoto )})
+    }
+  }).then(() => {
+    return slouch.db.view(HORSES_DB, HORSES_DESIGN_DOC, 'horsePhotos', {include_docs: true}).each(horsePhoto => {
+      if (horsePhoto.doc.uri.startsWith('https://')) {
+        return uploadPhoto(horsePhoto, 'equesteo-horse-photos-3').catch(e => { console.log(horsePhoto)})
+      }
+    })
+  }).then(() => {
+    return slouch.db.view(RIDES_DB, RIDES_DESIGN_DOC, 'ridePhotos', {include_docs: true}).each(ridePhoto => {
+      if (ridePhoto.doc.uri.startsWith('https://')) {
+        return uploadPhoto(ridePhoto, 'equesteo-ride-photos-3').catch(e => { console.log(ridePhoto)})
+      }
+    })
+  }).then(() => {
+    res.json({'all': 'done'})
+  }).catch(e => {
+    console.log(e)
+    next(e)
+  })
+})
+
+
 // Create endpoints
-postRide(app)
-couchProxy(app)
-users(app)
+app.use('/couchProxy', couchProxyRouter)
+app.use('/users', usersRouter)
+app.use('', photosRouter)
 
 const ESClient = new elasticsearch.Client({
   host: configGet(ELASTICSEARCH_HOST),
@@ -75,10 +108,8 @@ const gcmClient = new gcm.Sender(configGet(GCM_API_KEY));
 
 const ddbService = new DynamoDBService()
 
-
 startUsersChangeIterator(ESClient, slouch)
 startRideChangeIterator(slouch, gcmClient, ddbService)
-
 
 app.get('/errorTest', (req, res) => {
   throw new Error('Broke!');
@@ -91,136 +122,6 @@ app.get('/unauthorizedTest', (req, res) => {
 
 app.get('/checkAuth', authenticator, (req, res) => {
   return res.json({})
-})
-
-const userMeta = multer({
-  storage: multerS3({
-    s3: s3,
-    bucket: 'equesteo-profile-photos-2',
-    key: function (req, file, cb) {
-      cb(null, file.originalname)
-    }
-  })
-});
-app.post('/users/profilePhoto', authenticator, userMeta.single('file'), (req, res, next) => {
-  return res.json({})
-})
-
-
-const horseMeta = multer({
-  storage: multerS3({
-    s3: s3,
-    bucket: 'equesteo-horse-photos',
-    key: function (req, file, cb) {
-      cb(null, file.originalname)
-    }
-  })
-});
-app.post('/users/horsePhoto', authenticator, horseMeta.single('file'), (req, res, next) => {
-  console.log('horse photo uploaded')
-  return res.json({})
-})
-
-const rideMeta = multer({
-  storage: multerS3({
-    s3: s3,
-    bucket: 'equesteo-ride-photos-2',
-    key: function (req, file, cb) {
-      cb(null, file.originalname)
-    }
-  })
-});
-app.post('/users/ridePhoto', authenticator, rideMeta.single('file'), (req, res, next) => {
-  console.log('ride photo uploaded')
-  return res.json({})
-})
-
-app.get('/users/search', authenticator, async (req, res) => {
-  const query = req.query.q
-  const qResp = await ESClient.search({
-    index: 'users',
-    q: query
-  })
-  const docs = []
-  for (let hit of qResp.hits.hits) {
-    const doc = Object.assign({}, hit._source)
-    doc._id = hit._id
-    delete doc.email
-    docs.push(doc)
-  }
-  return res.json(docs)
-})
-
-app.get('/fixElevations', (req, res) => {
-  function metersToFeet (meters) {
-    return meters * 3.28084
-  }
-
-  function newElevationGain (distance, lastElevation, newElevation, oldTotal) {
-    let newTotal = oldTotal
-    const diff = metersToFeet(Math.abs(newElevation - lastElevation))
-    if (diff) {
-      const grade = diff / (distance * 5280)
-      if (grade < 0.5) {
-        const elevationChange = newElevation - lastElevation
-        newTotal = oldTotal + (elevationChange > 0 ? elevationChange : 0)
-      }
-    }
-    return newTotal
-  }
-
-  function parseElevationData (rideCoordinates, rideElevations) {
-    let totalGain = 0
-    let lastPoint = null
-
-    for (let rideCoord of rideCoordinates.rideCoordinates) {
-      const latEl = rideElevations.elevations[rideCoord[0].toFixed(4)]
-      const elevation = latEl ? latEl[rideCoord[1].toFixed(4)] : null
-      if (elevation) {
-        if (lastPoint) {
-          const newDistance = haversine(
-            lastPoint[0],
-            lastPoint[1],
-            rideCoord[0],
-            rideCoord[1]
-          )
-
-          const lastElevation = rideElevations.elevations[lastPoint[0].toFixed(4)][lastPoint[1].toFixed(4)]
-          totalGain = newElevationGain(newDistance, lastElevation, elevation, totalGain)
-        }
-        lastPoint = rideCoord
-      }
-    }
-    return totalGain
-  }
-
-  const rides = {}
-  const rideCoordinates = {}
-  const rideElevations = {}
-  slouch.db.view(RIDES_DB, RIDES_DESIGN_DOC, 'rideData', {include_docs: true}).each(doc => {
-    if (doc.doc.type === 'ride') {
-      rides[doc.doc._id] = doc.doc
-    } else if (doc.doc.type === 'rideElevations') {
-      rideElevations[doc.doc._id] = doc.doc
-    } else if (doc.doc.type === 'rideCoordinates') {
-      rideCoordinates[doc.doc._id] = doc.doc
-    }
-  }).then(() => {
-    const docUpdates = []
-    for (let rideID of Object.keys(rides)) {
-      console.log(rideID)
-      const coords = rideCoordinates[rideID + '_coordinates']
-      const elevations = rideElevations[rideID + '_elevations']
-      if (elevations) {
-        const gain = parseElevationData(coords, elevations)
-        const newDoc = Object.assign({}, elevations, {elevationGain: gain})
-        docUpdates.push(slouch.doc.upsert(RIDES_DB, newDoc))
-      }
-    }
-    return Promise.all(docUpdates)
-  }).then(() => {
-    res.sendStatus(200)
-  })
 })
 
 app.get('/replicateProd', async (req, res) => {

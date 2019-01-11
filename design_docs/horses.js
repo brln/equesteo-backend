@@ -26,6 +26,13 @@ export function createHorsesDesignDoc (slouch) {
               emit(doc.userID, doc.horseID)
             }
           }.toString()
+        },
+        horsePhotos: {
+          map: function (doc) {
+            if (doc.type === 'horsePhoto') {
+              emit(doc._id, null)
+            }
+          } .toString()
         }
       },
       filters: {

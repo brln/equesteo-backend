@@ -1,42 +1,73 @@
-export default function startUsersChangeIterator (ESClient, slouch) {
-  // @TODO: this is going to have to change when there are
-  // a ton of changes, or it will be loading them all every
-  // time the backend boots.
-  let iterator = slouch.db.changes('users', {
-    include_docs: true,
-    feed: 'continuous',
-    heartbeat: true,
-  })
+import { USERS_DB, USERS_DESIGN_DOC } from "../design_docs/users"
 
-  iterator.each(async (item) => {
-    if (item.doc && item.doc.type === 'user') {
-      console.log('updating elasticsearch record: ' + item.doc._id)
-      await ESClient.update({
-        index: 'users',
-        type: 'users',
-        body: {
-          doc: {
-            firstName: item.doc.firstName,
-            lastName: item.doc.lastName,
-            profilePhotoID: item.doc.profilePhotoID,
-            photosByID: item.doc.photosByID,
-            aboutMe: item.doc.aboutMe,
+export default function startUsersChangeIterator (ESClient, slouch) {
+  slouch.db.view(USERS_DB, USERS_DESIGN_DOC, 'byID', {include_docs: true}).each(item => {
+    if (item.deleted !== true) {
+      let profilePhotoURL
+      return slouch.doc.get(USERS_DB, item.doc.profilePhotoID).then((profilePhoto) => {
+        profilePhotoURL = profilePhoto.uri
+      }).catch(() => {}).then(() => {
+        return ESClient.update({
+          index: 'users',
+          type: 'users',
+          body: {
+            doc: {
+              firstName: item.doc.firstName,
+              lastName: item.doc.lastName,
+              profilePhotoURL,
+              aboutMe: item.doc.aboutMe,
+            },
+            doc_as_upsert: true,
           },
-          doc_as_upsert: true,
-        },
-        id: item.doc._id,
+          id: item.doc._id,
+        })
+      }).then(resp => {
+        console.log(resp)
       })
+
     }
-    if (item.deleted) {
-      try {
-        await ESClient.delete({
+  }).then(() => {
+    console.log('initial User elastic record update complete')
+    let iterator = slouch.db.changes('users', {
+      include_docs: true,
+      feed: 'continuous',
+      heartbeat: true,
+      since: 'now'
+    })
+
+    iterator.each((item) => {
+      if (item.doc && item.doc.type === 'user' && item.doc.deleted !== true) {
+        let profilePhotoURL
+        return slouch.doc.get(USERS_DB, item.doc.profilePhotoID).then((profilePhoto) => {
+          profilePhotoURL = profilePhoto.uri
+        }).catch(() => {}).then(() => {
+          console.log('updating elasticsearch record: ' + item.doc._id)
+          return ESClient.update({
+            index: 'users',
+            type: 'users',
+            body: {
+              doc: {
+                firstName: item.doc.firstName,
+                lastName: item.doc.lastName,
+                profilePhotoURL,
+                aboutMe: item.doc.aboutMe,
+              },
+              doc_as_upsert: true,
+            },
+            id: item.doc._id,
+          })
+        })
+      } else if (item.doc && item.doc.type === 'user') {
+        console.log('deleting elasticsearch record: ' + item.doc._id)
+        return ESClient.delete({
           index: 'users',
           type: 'users',
           id: item.doc._id
         })
-        console.log('deleting elasticsearch record: ' + item.doc._id)
-      } catch (e) {}
-    }
-    return Promise.resolve()
+
+      }
+    })
+  }).catch(e => {
+    console.log(e)
   })
 }
