@@ -21,10 +21,7 @@ export default function startUsersChangeIterator (ESClient, slouch) {
           },
           id: item.doc._id,
         })
-      }).then(resp => {
-        console.log(resp)
       })
-
     }
   }).then(() => {
     console.log('initial User elastic record update complete')

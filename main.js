@@ -61,7 +61,7 @@ app.get('/resizeAllImages', (req, res) => {
       fetch(photo.doc.uri).then(res => {
         return res.buffer()
       }).then(buffer => {
-        return PhotoUploader.uploadPhoto(buffer, filename, bucket)
+        return PhotoUploader.uploadPhoto(buffer, filename, bucket, true)
       }).then(() => {
         res()
       }).catch(e => {
@@ -213,6 +213,10 @@ const errorHandler = (err, req, res, next) => {
 };
 
 app.use(errorHandler)
+
+app.use(function (req, res, next) {
+  res.status(404).json({'error': '404 Not Found'})
+})
 
 app.listen(process.env.PORT || 8080, '0.0.0.0', function () {
   console.log('Example app listening on port 8080!');

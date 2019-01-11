@@ -6,7 +6,6 @@ import { authenticator } from '../auth'
 import PhotoUploader from '../services/photoUploader'
 
 const router = express.Router()
-router.use(authenticator)
 router.use(bodyParser.urlencoded({ extended: true }))
 
 function multipartMiddleware () {
@@ -14,7 +13,7 @@ function multipartMiddleware () {
 }
 
 // remove this route when everyone > 0.48.0
-router.post('/users/profilePhoto', multipartMiddleware(), (req, res) => {
+router.post('/users/profilePhoto', authenticator, multipartMiddleware(), (req, res) => {
   console.log('user photo upload started')
   const file = req.files.file[0]
   PhotoUploader.uploadPhoto(file.buffer, file.originalname, 'equesteo-profile-photos-2').then(() => {
@@ -22,7 +21,7 @@ router.post('/users/profilePhoto', multipartMiddleware(), (req, res) => {
   })
 })
 
-router.post('/photos/user', multipartMiddleware(), (req, res) => {
+router.post('/photos/user', authenticator, multipartMiddleware(), (req, res) => {
   console.log('user photo upload started')
   const file = req.files.file[0]
   PhotoUploader.uploadPhoto(file.buffer, file.originalname, 'equesteo-profile-photos-2').then(() => {
@@ -32,7 +31,7 @@ router.post('/photos/user', multipartMiddleware(), (req, res) => {
 
 
 // remove this route when everyone > 0.48.0
-router.post('/users/horsePhoto', multipartMiddleware(), (req, res) => {
+router.post('/users/horsePhoto', authenticator, multipartMiddleware(), (req, res) => {
   console.log('horse photo upload started')
   const file = req.files.file[0]
   PhotoUploader.uploadPhoto(file.buffer, file.originalname, 'equesteo-horse-photos').then(() => {
@@ -41,7 +40,7 @@ router.post('/users/horsePhoto', multipartMiddleware(), (req, res) => {
 
 })
 
-router.post('/photos/horse', multipartMiddleware(), (req, res) => {
+router.post('/photos/horse', authenticator, multipartMiddleware(), (req, res) => {
   console.log('horse photo upload started')
   const file = req.files.file[0]
   PhotoUploader.uploadPhoto(file.buffer, file.originalname, 'equesteo-horse-photos').then(() => {
@@ -51,7 +50,7 @@ router.post('/photos/horse', multipartMiddleware(), (req, res) => {
 
 
 // remove this route when everyone > 0.48.0
-router.post('/users/ridePhoto', multipartMiddleware(), (req, res) => {
+router.post('/users/ridePhoto', authenticator, multipartMiddleware(), (req, res) => {
   console.log('ride photo upload started')
   const file = req.files.file[0]
   PhotoUploader.uploadPhoto(file.buffer, file.originalname, 'equesteo-ride-photos-2').then(() => {
@@ -60,7 +59,7 @@ router.post('/users/ridePhoto', multipartMiddleware(), (req, res) => {
 
 })
 
-router.post('/photos/ride', multipartMiddleware(), (req, res) => {
+router.post('/photos/ride', authenticator, multipartMiddleware(), (req, res) => {
   console.log('ride photo upload started')
   const file = req.files.file[0]
   PhotoUploader.uploadPhoto(file.buffer, file.originalname, 'equesteo-ride-photos-2').then(() => {
