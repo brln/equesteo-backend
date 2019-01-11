@@ -72,18 +72,18 @@ app.get('/resizeAllImages', (req, res) => {
 
   slouch.db.view(USERS_DB, USERS_DESIGN_DOC, 'userPhotos', {include_docs: true}).each(userPhoto => {
     if (userPhoto.doc.uri.startsWith('https://')) {
-      return uploadPhoto(userPhoto, 'equesteo-profile-photos-3').catch(e => { console.log(userPhoto )})
+      return uploadPhoto(userPhoto, 'equesteo-profile-photos-2').catch(e => { console.log(userPhoto )})
     }
   }).then(() => {
     return slouch.db.view(HORSES_DB, HORSES_DESIGN_DOC, 'horsePhotos', {include_docs: true}).each(horsePhoto => {
       if (horsePhoto.doc.uri.startsWith('https://')) {
-        return uploadPhoto(horsePhoto, 'equesteo-horse-photos-3').catch(e => { console.log(horsePhoto)})
+        return uploadPhoto(horsePhoto, 'equesteo-horse-photos').catch(e => { console.log(horsePhoto)})
       }
     })
   }).then(() => {
     return slouch.db.view(RIDES_DB, RIDES_DESIGN_DOC, 'ridePhotos', {include_docs: true}).each(ridePhoto => {
       if (ridePhoto.doc.uri.startsWith('https://')) {
-        return uploadPhoto(ridePhoto, 'equesteo-ride-photos-3').catch(e => { console.log(ridePhoto)})
+        return uploadPhoto(ridePhoto, 'equesteo-ride-photos-2').catch(e => { console.log(ridePhoto)})
       }
     })
   }).then(() => {
