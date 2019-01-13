@@ -24,7 +24,7 @@ import { couchProxyRouter, photosRouter, usersRouter } from './controllers'
 import { createUsersDesignDoc, USERS_DB, USERS_DESIGN_DOC } from "./design_docs/users"
 import { createHorsesDesignDoc, HORSES_DB, HORSES_DESIGN_DOC } from "./design_docs/horses"
 import { createRidesDesignDoc, RIDES_DB, RIDES_DESIGN_DOC } from './design_docs/rides'
-import PhotoUploader from './services/PhotoUploader'
+import PhotoUploader from './services/photoUploader'
 
 import startRideChangeIterator from './ChangeIterators/rides'
 import startUsersChangeIterator from './ChangeIterators/users'
