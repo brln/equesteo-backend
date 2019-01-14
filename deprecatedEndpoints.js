@@ -414,3 +414,44 @@ app.get('/fixElevations', (req, res) => {
     res.sendStatus(200)
   })
 })
+
+app.get('/resizeAllImages', (req, res) => {
+  function uploadPhoto (photo, bucket) {
+    const splitup = photo.doc.uri.split('/')
+    const filename = splitup[splitup.length - 1]
+    return new Promise((res, rej) => {
+      fetch(photo.doc.uri).then(res => {
+        return res.buffer()
+      }).then(buffer => {
+        return PhotoUploader.uploadPhoto(buffer, filename, bucket, true)
+      }).then(() => {
+        res()
+      }).catch(e => {
+        rej(e)
+      })
+    })
+  }
+
+  slouch.db.view(USERS_DB, USERS_DESIGN_DOC, 'userPhotos', {include_docs: true}).each(userPhoto => {
+    if (userPhoto.doc.uri.startsWith('https://')) {
+      return uploadPhoto(userPhoto, 'equesteo-profile-photos-2').catch(e => { console.log(userPhoto )})
+    }
+  }).then(() => {
+    return slouch.db.view(HORSES_DB, HORSES_DESIGN_DOC, 'horsePhotos', {include_docs: true}).each(horsePhoto => {
+      if (horsePhoto.doc.uri.startsWith('https://')) {
+        return uploadPhoto(horsePhoto, 'equesteo-horse-photos').catch(e => { console.log(horsePhoto)})
+      }
+    })
+  }).then(() => {
+    return slouch.db.view(RIDES_DB, RIDES_DESIGN_DOC, 'ridePhotos', {include_docs: true}).each(ridePhoto => {
+      if (ridePhoto.doc.uri.startsWith('https://')) {
+        return uploadPhoto(ridePhoto, 'equesteo-ride-photos-2').catch(e => { console.log(ridePhoto)})
+      }
+    })
+  }).then(() => {
+    res.json({'all': 'done'})
+  }).catch(e => {
+    console.log(e)
+    next(e)
+  })
+})
