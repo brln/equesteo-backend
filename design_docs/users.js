@@ -30,6 +30,14 @@ export function createUsersDesignDoc (slouch) {
             }
           }.toString()
         },
+        relevantFollows: {
+          map: function (doc) {
+            if (doc.type === 'follow') {
+              emit(doc.followingID, [doc.followerID, 'following'])
+              emit(doc.followerID, [doc.followingID, 'follower'])
+            }
+          }.toString()
+        },
         trainingsByUserID: {
           map: function (doc) {
             if (doc.type === 'training') {
@@ -60,6 +68,23 @@ export function createUsersDesignDoc (slouch) {
             return true
           } else if (doc.type === 'user' || doc.type === 'follow') {
             return true
+          }
+        }.toString(),
+        byUserIDs2: function (doc, req) {
+          let userIDs = req.query.userIDs.split(',') // All following and followers
+          let ownID = req.query.ownUserID
+          if (doc.type === 'training' || doc.type === 'userPhoto') {
+            if (doc.userID === ownID || userIDs.indexOf(doc.userID) >= 0) {
+              return true
+            }
+          } else if (doc.type === 'user') {
+            if (doc._id === ownID || userIDs.indexOf(doc._id) >= 0) {
+              return true
+            }
+          } else if (doc.type === 'follow') {
+            if (userIDs.indexOf(doc.followingID) >= 0 || userIDs.indexOf(doc.followerID) >= 0) {
+              return true
+            }
           }
         }.toString()
       }
