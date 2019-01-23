@@ -1,4 +1,5 @@
 import aws from 'aws-sdk'
+import murmur from 'murmurhash-js'
 import express from 'express'
 import fetch from 'node-fetch'
 import gcm from 'node-gcm'
@@ -18,17 +19,18 @@ import {
   ELASTICSEARCH_HOST,
   GCM_API_KEY,
   LOGGING_TYPE,
+  MAPBOX_TOKEN,
   NODE_ENV,
 } from "./config"
 import { couchProxyRouter, photosRouter, usersRouter } from './controllers'
-import { createUsersDesignDoc, USERS_DB, USERS_DESIGN_DOC } from "./design_docs/users"
-import { createHorsesDesignDoc, HORSES_DB, HORSES_DESIGN_DOC } from "./design_docs/horses"
-import { createRidesDesignDoc, RIDES_DB, RIDES_DESIGN_DOC } from './design_docs/rides'
-import PhotoUploader from './services/photoUploader'
+import { createUsersDesignDoc, USERS_DB } from "./design_docs/users"
+import { createHorsesDesignDoc, HORSES_DB } from "./design_docs/horses"
+import { createRidesDesignDoc, RIDES_DB } from './design_docs/rides'
 
 import startRideChangeIterator from './ChangeIterators/rides'
 import startUsersChangeIterator from './ChangeIterators/users'
 import DynamoDBService from './services/dynamoDB'
+import S3Service from './services/s3'
 
 const app = express()
 app.use(logger(configGet(LOGGING_TYPE)))
@@ -81,6 +83,50 @@ app.get('/unauthorizedTest', (req, res) => {
 app.get('/checkAuth', authenticator, (req, res) => {
   return res.json({})
 })
+
+
+app.get('/rideMap/:url', (req, res, next) => {
+  const decoded = new Buffer(req.params.url, 'base64').toString('ascii')
+  if (!decoded.startsWith('https://api.mapbox.com/styles/v1/equesteo/')) {
+    return res.sendStatus(400)
+  }
+
+  const hashKey = `${murmur.murmur3(decoded, 'equesteo-map-url')}.png`
+
+  const BUCKET_NAME = 'equesteo-ride-maps'
+  const s3Service = new S3Service()
+  let found = false
+  let fromMapbox
+  s3Service.get(BUCKET_NAME, hashKey).then(data => {
+    found = true
+    return data.Body
+  }).catch(() => { console.log(`${hashKey} not found`)}).then(data => {
+    if (found) {
+      return data
+    } else {
+      return fetch(decoded + `?access_token=${configGet(MAPBOX_TOKEN)}`).then(resp => {
+        console.log('fetching from mapbox')
+        return resp.buffer()
+      }).then(data => {
+        console.log('reading mapbox buffer')
+        fromMapbox = data
+        return data
+      })
+    }
+  }).then(imageData => {
+    res.setHeader("content-type", "image/png")
+    return res.send(imageData)
+  }).then(() => {
+    if (!found) {
+      return s3Service.put(BUCKET_NAME, hashKey, fromMapbox).then(() => {
+        console.log(`cached ${hashKey}`)
+      }).catch(e => {
+        console.log(e)
+      })
+    }
+  })
+})
+
 
 app.get('/replicateProd', async (req, res) => {
   if (configGet(NODE_ENV) !== 'local') {

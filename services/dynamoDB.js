@@ -30,7 +30,7 @@ export default class DynamoDBService {
     })
   }
 
-   async createTable(keyName, keyType, tableName) {
+   async createTable(keyName, keyType, tableName, readCapacity=1, writeCapacity=1) {
     return new Promise((resolve, reject) => {
       const params = {
         AttributeDefinitions: [
@@ -46,8 +46,8 @@ export default class DynamoDBService {
           },
         ],
         ProvisionedThroughput: {
-          ReadCapacityUnits: 1,
-          WriteCapacityUnits: 1
+          ReadCapacityUnits: readCapacity,
+          WriteCapacityUnits: writeCapacity
         },
         TableName: tableName,
         StreamSpecification: {
