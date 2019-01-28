@@ -61,6 +61,7 @@ export const authenticator = (req, res, next) => {
             // DynamoDB, we need to return the same new token to all of them
             // or we end up in a race condition for what new token gets set
             // on the client.
+            console.log('token from cache')
             res.set('x-auth-token', refreshTokenCache[incomingRefreshToken])
             next()
           } else {
@@ -72,6 +73,7 @@ export const authenticator = (req, res, next) => {
             found.oldToken = { S: foundRefreshToken }
             found.nextToken = { S: token }
             ddbService.putItem(USERS_TABLE_NAME, found).then(() => {
+              console.log('token cache cleared')
               delete refreshTokenCache[incomingRefreshToken]
               next()
             }).catch(e => { next(e) })
