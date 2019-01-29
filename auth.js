@@ -5,8 +5,8 @@ import { makeToken, unixTimeNow } from './helpers'
 import DynamoDBService from './services/dynamoDB'
 
 const USERS_TABLE_NAME = 'equesteo_users'
-const TOKEN_EXPIRATION = 1000 * 60 * 2 // FIXME FIXME FIXME
-const TOKEN_ALLOWED_OVERLAP = 1000 * 30 // FIXME FIXME FIXME
+const TOKEN_EXPIRATION = 1000 * 60 * 18
+const TOKEN_ALLOWED_OVERLAP = 1000 * 60 * 2
 
 const refreshTokenCache = {}
 const clearOldTokenTimeouts = {}
@@ -67,14 +67,15 @@ export const authenticator = (req, res, next) => {
           } else {
             const { token, refreshToken } = makeToken(id, email)
             console.log('making new token: ' + token)
+            console.log('making new refreshToken: ' + refreshToken)
             refreshTokenCache[incomingRefreshToken] = token
             res.set('x-auth-token', token)
             found.refreshToken = { S: refreshToken }
             found.oldToken = { S: foundRefreshToken }
             found.nextToken = { S: token }
             ddbService.putItem(USERS_TABLE_NAME, found).then(() => {
-              console.log('token cache cleared')
               delete refreshTokenCache[incomingRefreshToken]
+              console.log('token cache cleared')
               next()
             }).catch(e => { next(e) })
           }
