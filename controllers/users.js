@@ -144,7 +144,8 @@ router.post('/', async (req, res, next) => {
         id: {S: newUser.id},
         enabled: {BOOL: true},
         refreshToken: {S: refreshToken},
-        nextToken: {S:token}
+        nextToken: {S:token},
+        acceptedTOSVersion: {S: '1'},
       }).then(() => {
         console.log('ddb record created')
         res.set('x-auth-token', token).json({
@@ -276,6 +277,15 @@ router.post('/setDistribution', authenticator, (req, res, next) => {
   } else {
     return res.status(400)
   }
+})
+
+router.post('/feedback', authenticator, (req, res, next) => {
+  const id = req.body.id
+  const feedback = req.body.feedback
+  const emailService = new EmailerService()
+  emailService.sendFeedback(id, feedback).then(() => {
+    res.json({})
+  })
 })
 
 router.get('/search', authenticator, async (req, res) => {

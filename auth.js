@@ -10,6 +10,7 @@ const TOKEN_ALLOWED_OVERLAP = 1000 * 60 * 2
 
 const refreshTokenCache = {}
 const clearOldTokenTimeouts = {}
+const fetchCount = {}
 
 export const authenticator = (req, res, next) => {
   const authHeader = req.headers.authorization
@@ -24,25 +25,21 @@ export const authenticator = (req, res, next) => {
     res.locals.userID = decoded.id
     res.locals.userEmail = decoded.email
 
-    // Give old tokens a pass. When everyone > 0.45.0,
-    // if (!token || !decoded || !decoded.createdAt)
-    if (!token || !decoded) {
+    if (!token || !decoded || !decoded.createdAt) {
       return res.status(401).json({error: 'Invalid Authorization header'})
-    }
-    if (!decoded.createdAt) {
-      console.log('using an ancient unlimited token')
-      return next() // and remove this
     }
 
     const timeDiff = unixTimeNow() - decoded.createdAt
     if (timeDiff > TOKEN_EXPIRATION) {
       console.log('Token is expired, fetching a new one')
-      // Token is expired, fetching a new one
       const id = decoded.id
       const email = decoded.email
       const incomingRefreshToken = decoded.refreshToken
       const ddbService = new DynamoDBService()
+      !fetchCount[email] ? fetchCount[email] = 1 : fetchCount[email] += 1
       ddbService.getItem(USERS_TABLE_NAME, { email: {S: email }}).then(found => {
+        fetchCount[email] === 1 ? delete fetchCount[email] : fetchCount[email] -= 1
+        console.log(fetchCount)
         if (found.enabled.BOOL === false) {
           return res.status(401).json({error: 'Account is disabled.'})
         }
@@ -74,7 +71,9 @@ export const authenticator = (req, res, next) => {
             found.oldToken = { S: foundRefreshToken }
             found.nextToken = { S: token }
             ddbService.putItem(USERS_TABLE_NAME, found).then(() => {
-              delete refreshTokenCache[incomingRefreshToken]
+              if (!fetchCount[email]) {
+                delete refreshTokenCache[incomingRefreshToken]
+              }
               console.log('token cache cleared')
               next()
             }).catch(e => { next(e) })
