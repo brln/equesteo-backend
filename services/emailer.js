@@ -37,7 +37,7 @@ export default class EmailerService {
       to: 'info@equesteo.com',
       from: 'info@equesteo.com',
       subject: 'New Feedback!',
-      text: feedback,
+      text: userID + '\n\n\n' + feedback,
     }
     if (process.env.NODE_ENV === 'production') {
       return sgMail.send(msg);
