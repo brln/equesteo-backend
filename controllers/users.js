@@ -154,6 +154,10 @@ router.post('/', async (req, res, next) => {
           following: [configGet(NICOLE_USER_ID)],
           followers: [],
         })
+
+        const emailer = new EmailerService()
+        console.log(email)
+        return emailer.signupHappened(email)
       })
     })
   }).catch(e => {

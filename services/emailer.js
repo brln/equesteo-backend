@@ -42,8 +42,20 @@ export default class EmailerService {
     if (process.env.NODE_ENV === 'production') {
       return sgMail.send(msg);
     } else {
-      console.log(userID)
-      console.log(feedback)
+      return Promise.resolve()
+    }
+  }
+
+  signupHappened (email) {
+    const msg = {
+      to: 'info@equesteo.com',
+      from: 'info@equesteo.com',
+      subject: 'New Signup!',
+      text: email,
+    }
+    if (process.env.NODE_ENV === 'production') {
+      return sgMail.send(msg);
+    } else {
       return Promise.resolve()
     }
   }
