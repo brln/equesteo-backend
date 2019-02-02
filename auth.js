@@ -116,3 +116,20 @@ export const authenticator = (req, res, next) => {
     return res.status(401).json({error: 'Authorization header required'})
   }
 }
+
+/***
+ * Reason for fetchCount:
+ *
+ * 3 requests sent with token A
+ * First request arrives, expired fetching a new one, fetch DDB
+ * Next request arrives, expired fetching new one, fetch DDB
+ * Third request arrives, expired fetching new one, fetch DDB
+ *
+ * First request DDB returns, incomingRefreshToken === foundRefreshToken, no token in cache, new token made, put on response start put to DDB
+ *
+ * Second request DDB returns, incomingRefreshToken === foundRefreshToken, token in cache, return same token
+ *
+ * First DDB put returns, token cache cleared, rest of response begins
+ *
+ * Third request DDB returns, incomingRefreshToken === foundRefreshToken, token not in cache, new token gets made and fucks it up
+ */

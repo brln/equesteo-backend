@@ -28,3 +28,9 @@ Pre - install openSSH when installing ubuntu, forward port 4022, `ssh equesteo@l
 3. `curl -L https://couchdb.apache.org/repo/bintray-pubkey.asc \
     | sudo apt-key add -`
 4. `sudo apt-get update && sudo apt-get install couchdb`
+
+# Detailed Monitoring
+wget https://s3.amazonaws.com/amazoncloudwatch-agent/ubuntu/amd64/latest/amazon-cloudwatch-agent.deb
+sudo dpkg -i -E ./amazon-cloudwatch-agent.deb
+sudo /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-config-wizard
+sudo /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -c file:./config.json -s

@@ -12,7 +12,7 @@ export default class EmailerService {
 
   async sendCode (email, token) {
     const downcase = token.replace(/\s+/g, '').toLowerCase()
-    const b64email = Buffer.from(email).toString('base64')
+    const b64email = encodeURIComponent(Buffer.from(email).toString('base64'))
     const msg = {
       to: email,
       from: 'info@equesteo.com',
