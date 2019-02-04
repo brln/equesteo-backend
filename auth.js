@@ -39,7 +39,9 @@ export const authenticator = (req, res, next) => {
       !fetchCount[email] ? fetchCount[email] = 1 : fetchCount[email] += 1
       ddbService.getItem(USERS_TABLE_NAME, { email: {S: email }}).then(found => {
         fetchCount[email] === 1 ? delete fetchCount[email] : fetchCount[email] -= 1
-        console.log(fetchCount)
+        if (!found) {
+          return res.status(401).json({error: 'Account not found.'})
+        }
         if (found.enabled.BOOL === false) {
           return res.status(401).json({error: 'Account is disabled.'})
         }

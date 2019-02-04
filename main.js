@@ -160,12 +160,12 @@ app.get('/replicateProd', async (req, res) => {
       throw e
     }
 
-    const prodCouch = `http://equesteo:${process.env.PROD_COUCH_PASSWORD}@ec2-52-9-138-254.us-west-1.compute.amazonaws.com:5984/`
+    const prodCouch = `http://equesteo:${process.env.PROD_COUCH_PASSWORD}@52.9.138.254:5984/`
     const dbs = ['horses', 'rides', 'users']
 
     const replications = []
     for (let db of dbs) {
-      console.log(`starting replicating ${db}`)
+      console.log(`starting replication on ${db}`)
       replications.push(slouch.db.replicate({
         source: prodCouch + db,
         target: db
