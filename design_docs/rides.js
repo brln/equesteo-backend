@@ -13,6 +13,13 @@ export function createRidesDesignDoc (slouch) {
             }
           }.toString()
         },
+        ridesByStartTime: {
+          map: function (doc) {
+            if (doc.type === 'ride') {
+              emit(doc.startTime, null);
+            }
+          }.toString()
+        },
         rideData: {
           map: function (doc) {
             if (doc.type === 'ride') {

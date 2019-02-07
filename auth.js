@@ -54,7 +54,8 @@ export const authenticator = (req, res, next) => {
         console.log('found: ' + foundRefreshToken)
         console.log('found old: ' + foundOldToken)
         if (incomingRefreshToken === foundRefreshToken) {
-          // Using the most recent refresh token
+          // The token is expired but we have the correct refresh token, this
+          // is the happy path.
           if (refreshTokenCache[incomingRefreshToken]) {
             // If multiple requests come in faster than we can get/save to
             // DynamoDB, we need to return the same new token to all of them

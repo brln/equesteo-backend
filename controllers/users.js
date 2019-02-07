@@ -257,7 +257,7 @@ router.post('/setFCMToken', authenticator, (req, res, next) => {
       next(e)
     })
   } else {
-    return res.status(400)
+    return res.status(400).json({'error': 'Bad ID or Token'})
   }
 })
 
@@ -279,7 +279,7 @@ router.post('/setDistribution', authenticator, (req, res, next) => {
       next(e)
     })
   } else {
-    return res.status(400)
+    return res.status(400).json({'error': 'Bad ID or Distribution'})
   }
 })
 

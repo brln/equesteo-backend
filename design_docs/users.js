@@ -30,6 +30,37 @@ export function createUsersDesignDoc (slouch) {
             }
           }.toString()
         },
+        leaderboardUsers: {
+          map: function (doc) {
+            if (doc.type === 'leaderboards') {
+              var userIDs = []
+              for (var timePeriod in doc.values) {
+                if (doc.values.hasOwnProperty(timePeriod)) {
+
+                  for (var statType in doc.values[timePeriod]) {
+                    if (doc.values[timePeriod].hasOwnProperty(statType)) {
+
+                      for (let i = 0; i < doc.values[timePeriod][statType].length; i++) {
+                        const pair = doc.values[timePeriod][statType][i]
+                        if (userIDs.indexOf(pair.riderID) < 0) {
+                          emit(pair.riderID, null)
+                          userIDs.push(pair.riderID)
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }.toString()
+        },
+        leaderboardOptOuts: {
+          map: function (doc) {
+            if (doc.type === 'user' && doc.leaderboardOptOut === true) {
+              emit(doc._id, null)
+            }
+          }.toString()
+        },
         relevantFollows: {
           map: function (doc) {
             if (doc.type === 'follow') {
@@ -85,6 +116,8 @@ export function createUsersDesignDoc (slouch) {
             if (userIDs.indexOf(doc.followingID) >= 0 || userIDs.indexOf(doc.followerID) >= 0) {
               return true
             }
+          } else if (doc.type === 'leaderboards') {
+            return true
           }
         }.toString()
       }

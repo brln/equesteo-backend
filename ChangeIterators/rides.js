@@ -1,3 +1,4 @@
+import moment from 'moment'
 import gcm from 'node-gcm'
 import * as Sentry from '@sentry/node'
 
@@ -5,8 +6,17 @@ import { HORSES_DB, HORSES_DESIGN_DOC } from "../design_docs/horses"
 import { RIDES_DB, RIDES_DESIGN_DOC } from "../design_docs/rides"
 import { USERS_DB, USERS_DESIGN_DOC } from "../design_docs/users"
 import { unixTimeNow } from '../helpers'
+import {calcLeaderboards, summarizeRides} from './helpers'
+import { configGet, COUCH_USERNAME, COUCH_PASSWORD, COUCH_HOST } from '../config'
+import CouchService from '../services/Couch'
 
 const TABLE_NAME = 'equesteo_fcm_tokens'
+
+const couchService = new CouchService(
+  configGet(COUCH_USERNAME),
+  configGet(COUCH_PASSWORD),
+  configGet(COUCH_HOST)
+)
 
 export default function startRideChangeIterator(slouch, gcmClient, ddbService) {
   let iterator = slouch.db.changes('rides', {
@@ -31,7 +41,6 @@ const trainingCache = {}
 const cacheRefs = {}
 class TrainingCache {
   static check(training) {
-    console.log(cacheRefs)
     if (!trainingCache[training.doc._id]) {
       trainingCache[training.doc._id] = training
       cacheRefs[training.doc._id] = 0
@@ -52,10 +61,12 @@ class TrainingCache {
 
 function recalcTrainingRecords(rideRecord, slouch) {
   // If there is a new ride
+  let leaderboardRecalc = false
   if (rideRecord.doc && rideRecord.doc.type === 'ride'
       && rideRecord.doc._rev.split('-')[0] === '1'
       && rideRecord.doc.isPublic === true) {
     console.log('new ride training recalc')
+    leaderboardRecalc = true
     const rideID = rideRecord.doc._id
     const userID = rideRecord.doc.userID
 
@@ -107,6 +118,7 @@ function recalcTrainingRecords(rideRecord, slouch) {
     && parseInt(rideRecord.doc._rev.split('-')[0]) > 1
     && rideRecord.doc.isPublic === true) {
     console.log('ride update training recalc')
+    leaderboardRecalc = true
     const key = `"${rideRecord.doc._id}"`
 
     slouch.doc.get(RIDES_DB, `${rideRecord.doc._id}_elevations`).then(elevations => {
@@ -135,6 +147,7 @@ function recalcTrainingRecords(rideRecord, slouch) {
     // If someone has created or edited a ride horse
   } else if (rideRecord.doc && rideRecord.doc.type === 'rideHorse') {
     console.log('ride horse training recalc')
+    leaderboardRecalc = true
     const key = `"${rideRecord.doc.rideID}"`
       // Find all the users who have a record of that ride on their training
     return slouch.db.view(USERS_DB, USERS_DESIGN_DOC, 'trainingsByRideID', {include_docs: true, key}).each(training => {
@@ -159,73 +172,43 @@ function recalcTrainingRecords(rideRecord, slouch) {
       console.log(e)
     })
   }
+
+  if (leaderboardRecalc) {
+    const rideIDs = []
+    let optOuts = null
+    slouch.db.view(RIDES_DB, RIDES_DESIGN_DOC, 'ridesByStartTime', {startkey: moment().startOf('year').valueOf()}).each((ride) => {
+      rideIDs.push(ride.id)
+    }).then(() => {
+      return couchService.getLeaderboardOptOutUsers()
+    }).then(_optOuts => {
+      optOuts = _optOuts.rows.reduce((a, o) => {
+        a[o.key] = true
+        return a
+      }, {})
+      return summarizeRides(couchService, rideIDs)
+    }).then(({ rideSummaries }) => {
+      const leaderboardRecord = calcLeaderboards(rideSummaries, optOuts)
+      return slouch.doc.upsert(USERS_DB, leaderboardRecord)
+    }).then(() => {
+      console.log('leaderboards updated')
+    })
+  }
 }
 
 function calcTrainingRecords (slouch) {
   const users = {}
-  const ridesPerHorse = {}
-  const rideSummaries = {}
-  const horselessRidesPerUserID = {}
+  const leaderboardOptOuts = {}
   slouch.db.view(USERS_DB, USERS_DESIGN_DOC, 'byID', { include_docs: true }).each(user => {
     // Fetch all users and the horses they have in their barn
     users[user.id] = []
-    horselessRidesPerUserID[user.id] = []
+    if (user.doc.leaderboardOptOut) {
+      leaderboardOptOuts[user.id] = true
+    }
     return slouch.db.view(HORSES_DB, HORSES_DESIGN_DOC, 'horseUsersByUserID', {include_docs: true, key: `"${user.id}"`}).each(horseUser => {
       users[user.id].push(horseUser.doc.horseID)
     })
   }).then(() => {
-    // Fetch all the rides, rideHorses, and rideElevations in the DB
-    slouch.db.view(RIDES_DB, RIDES_DESIGN_DOC, 'rideData', {include_docs: true}).each(record => {
-      if (!rideSummaries[record.key]) {
-        // Make sure we have a place to store accumulated information about each ride.
-        rideSummaries[record.key] = {}
-      }
-      if (record.doc.type === 'rideHorse') {
-        if (!ridesPerHorse[record.doc.horseID]) {
-          ridesPerHorse[record.doc.horseID] = []
-        }
-
-        // If the horses rides are not yet linked to the the ride referenced by the document
-        if (ridesPerHorse[record.doc.horseID].indexOf(rideSummaries[record.key]) < 0) {
-
-          // Save the horses ID to the ride record
-          if (!rideSummaries[record.key].horseIDs) {
-            rideSummaries[record.key].horseIDs = []
-          }
-          if (rideSummaries[record.key].horseIDs.indexOf(record.doc.horseID) < 0) {
-            rideSummaries[record.key].horseIDs.push(record.doc.horseID)
-          }
-
-          // We are going to end up with rides duplicated to different users
-          // because we are showing all the users all the rides on all the
-          // horses in their barn. Push the new reference to the ride into
-          // ridesPerHorse so we can find it later.
-          if (record.doc.horseID && ridesPerHorse[record.doc.horseID].indexOf() < 0) {
-            ridesPerHorse[record.doc.horseID].push(rideSummaries[record.key])
-            const foundHorseIndex = horselessRidesPerUserID[record.doc.userID].indexOf(rideSummaries[record.key])
-            if (foundHorseIndex) {
-              // We found a rideHorse for this ride, remove it from horselessRides
-              delete horselessRidesPerUserID[record.doc.userID][foundHorseIndex]
-            }
-          } else {
-            // This record has no horseID, it might be a ride with no horse if we
-            // don't find any rideHorse later in the process.
-            horselessRidesPerUserID[record.doc.userID].push(rideSummaries[record.key])
-          }
-        }
-      }
-
-      if (record.doc.type === 'ride') {
-        rideSummaries[record.key].rideID = record.key
-        rideSummaries[record.key].elapsedTimeSecs = record.doc.elapsedTimeSecs
-        rideSummaries[record.key].startTime = record.doc.startTime
-        rideSummaries[record.key].distance = record.doc.distance
-        rideSummaries[record.key].userID = record.doc.userID
-        rideSummaries[record.key].deleted = record.doc.deleted
-      } else if (record.doc.type === 'rideElevations') {
-        rideSummaries[record.key].elevationGain = record.doc.elevationGain
-      }
-    }).then(() => {
+    summarizeRides(couchService).then(({ ridesPerHorse, rideSummaries, horselessRidesPerUserID }) => {
       const allUpdates = []
       for (let userID of Object.keys(users)) {
         // Go through all the users, and replace their horses IDs
@@ -241,7 +224,7 @@ function calcTrainingRecords (slouch) {
           return accum
         }, [])
 
-        if (horselessRidesPerUserID[userID].length) {
+        if (horselessRidesPerUserID[userID] && horselessRidesPerUserID[userID].length) {
           rides = rides.concat(horselessRidesPerUserID[userID])
         }
 
@@ -257,6 +240,11 @@ function calcTrainingRecords (slouch) {
           slouch.doc.upsert(USERS_DB, trainingRecord)
         )
       }
+      const leaderboardRecord = calcLeaderboards(rideSummaries, leaderboardOptOuts)
+      allUpdates.push(
+        slouch.doc.upsert(USERS_DB, leaderboardRecord)
+      )
+
       return Promise.all(allUpdates)
     }).then(() => {
       console.log('training record initial generation complete')

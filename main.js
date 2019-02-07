@@ -213,7 +213,7 @@ if (configGet(NODE_ENV) !== 'local') {
 
 const errorHandler = (err, req, res, next) => {
   console.log(err);
-  res.sendStatus(500);
+  res.status(500).json({'error': '500 Internal Server Error'})
 };
 
 app.use(errorHandler)
