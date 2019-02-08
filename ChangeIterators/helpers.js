@@ -33,7 +33,7 @@ export function calcLeaderboards (rideSummaries, leaderboardOptOuts) {
   }, {})
 
   for (let ride of Object.values(rideSummaries)) {
-    if (ride.isPublic && ride.riderHorseID && ride.distance > 0 && !leaderboardOptOuts[ride.userID]) {
+    if (ride.isPublic && ride.deleted !== true && ride.riderHorseID && ride.distance > 0 && !leaderboardOptOuts[ride.userID]) {
       for (let timePeriod of Object.keys(timePeriods)) {
         if (moment(ride.startTime) > timePeriods[timePeriod]) {
           if (!leaderAccum[timePeriod][ride.userID]) {
