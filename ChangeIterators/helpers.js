@@ -17,7 +17,7 @@ const LEADERBOARD_TIME_PERIODS = [
 export function calcLeaderboards (rideSummaries, leaderboardOptOuts) {
   // If you make these calls on the same moment() object you get
   // whacky results. Bug?
-  const startOfWeek = moment().startOf('week')
+  const startOfWeek = moment().startOf('isoWeek')
   const startOfMonth = moment().startOf('month')
   const startOfYear = moment().startOf('year')
 
@@ -106,7 +106,7 @@ export function summarizeRides (couchService, rideIDs) {
           // Make sure we have a place to store accumulated information about each ride.
           rideSummaries[record.key] = {}
         }
-        if (record.doc.type === 'rideHorse') {
+        if (record.doc.type === 'rideHorse' && record.doc.deleted !== true) {
           if (!ridesPerHorse[record.doc.horseID]) {
             ridesPerHorse[record.doc.horseID] = []
           }
