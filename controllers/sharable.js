@@ -23,26 +23,50 @@ const s3 = new aws.S3()
 const router = express.Router()
 router.use(bodyParser.urlencoded({ extended: true }))
 
-const BUCKET = 'equesteo-sharable-map-images'
+const IMAGE_BUCKET = 'equesteo-sharable-map-images'
+const PAGE_BUCKET = 'equesteo-sharable-map-pages'
 
-function shareLink (filename) {
-  return `${configGet(OWN_URL)}/sharableMap/${filename}`
+function shareLink (key) {
+  return `${configGet(OWN_URL)}/sharableMap/${key}`
 }
 
-function createMap (avgSpeed, distance, featureCollection, rideTime, startDate, bucket, key) {
+function createMapPage (rideName, imagePath, shareLink, key) {
+  const template = fs.readFileSync(path.join(__dirname, '../views/publicSharableMap.mustache')).toString('ascii')
+  const asHTML = mustache.render(template, {
+    rideName,
+    imagePath,
+    shareLink,
+  })
+  const params = {
+    Bucket: PAGE_BUCKET,
+    Key: `${key}.html`,
+    Body: Buffer.from(asHTML)
+  }
+  return new Promise ((res, rej) => {
+    s3.upload(params, (s3Err, data) => {
+      if (s3Err) {
+        rej(s3Err)
+      } else {
+        res(data)
+      }
+    })
+  })
+}
+
+function createMap (rideData, bucket, key, filename) {
   const template = fs.readFileSync(path.join(__dirname, '../views/sharableMap.mustache')).toString('ascii')
   const content = mustache.render(template, {
-    avgSpeed,
-    distance,
-    featureCollection,
+    avgSpeed: rideData.avgSpeed,
+    distance: rideData.distance,
+    featureCollection: rideData.featureCollection,
     mapboxToken: configGet(MAPBOX_TOKEN),
-    rideTime,
-    startDate,
+    rideTime: rideData.rideTime,
+    startDate: rideData.startDate,
   })
   return pupeteer.launch({'args' : [ '--disable-web-security' ]}).then(browser => {
     return browser.newPage().then(page => {
       page.on('console', consoleObj => console.log(consoleObj.text()));
-      return page.setViewport({height: 800, width: 800}).then(() => {
+      return page.setViewport({height: 1080, width: 1080}).then(() => {
         return page.setContent(content)
       }).then(() => {
         return page.waitForSelector('#done', {timeout: 30000})
@@ -52,7 +76,7 @@ function createMap (avgSpeed, distance, featureCollection, rideTime, startDate, 
         console.log('uploading')
         const params = {
           Bucket: bucket,
-          Key: key,
+          Key: filename,
           Body: imageBuffer
         }
         return Promise.all([
@@ -77,37 +101,46 @@ function createMap (avgSpeed, distance, featureCollection, rideTime, startDate, 
   })
 }
 
-router.get('/sharableMap/:filename', (req, res, next) => {
-  const template = fs.readFileSync(path.join(__dirname, '../views/publicSharableMap.mustache')).toString('ascii')
-  res.set('Content-Type', 'text/html');
-  res.send(new Buffer(
-    mustache.render(template, {
-      bucket: BUCKET,
-      filename: `${req.params.filename}`
-    }))
-  )
+router.get('/sharableMap/:key', (req, res, next) => {
+  const key = `${req.params.key}.html`
+  const s3service = new S3Service()
+  s3service.get(PAGE_BUCKET, key).then(s3Resp => {
+    res.type('text/html')
+    res.send(new Buffer(s3Resp.Body))
+  }).catch(e => {
+    console.log(e)
+    res.send(404)
+  })
 })
 
 router.post('/sharableMap', authenticator, bodyParser.json(), (req, res, next) => {
   const id = req.body.id
   const rev = req.body.rev
-  const filename = `${murmur.murmur3(id + rev, 'equesteo-sharable-map-url')}.png`
+  const key = murmur.murmur3(id + rev, 'equesteo-sharable-map-url').toString()
+  const filename = `${key}.png`
+  const link = shareLink(key)
 
   const s3Service = new S3Service()
-
-  s3Service.checkExists(BUCKET, filename).then(exists => {
+  let returnData
+  s3Service.checkExists(IMAGE_BUCKET, filename).then(exists => {
     if (exists) {
       res.json({
-        mapURL: `https://s3-us-west-1.amazonaws.com/${BUCKET}/${filename}`,
-        shareLink: shareLink(filename)
+        mapURL: `https://s3-us-west-1.amazonaws.com/${IMAGE_BUCKET}/${filename}`,
+        shareLink: link
       })
     } else {
-      const featureCollection = JSON.stringify(mapCoordinates(req.body.rideCoordinates))
-      const startDate = moment(req.body.startTime).format('M-D-YY')
-      const distance = req.body.distance.toFixed(1)
-      const rideTime = timeToString(req.body.rideTime)
-      const avgSpeed = averageSpeed(req.body.rideTime, req.body.distance)
-      createMap(avgSpeed, distance, featureCollection, rideTime, startDate, BUCKET, filename).then(returnData => {
+      const rideData = {
+        featureCollection: JSON.stringify(mapCoordinates(req.body.rideCoordinates)),
+        startDate: moment(req.body.startTime).format('M-D-YY'),
+        distance: req.body.distance.toFixed(1),
+        rideTime: timeToString(req.body.rideTime),
+        avgSpeed: averageSpeed(req.body.rideTime, req.body.distance),
+      }
+      createMap(rideData, IMAGE_BUCKET, key, filename).then(_returnData => {
+        returnData = _returnData
+        const imagePath = `https://s3-us-west-1.amazonaws.com/${IMAGE_BUCKET}/${filename}`
+        return createMapPage(req.body.name, imagePath, link, key)
+      }).then(() => {
         res.json(returnData)
       }).catch(e => {
         next(e)
