@@ -22,7 +22,7 @@ import {
   MAPBOX_TOKEN,
   NODE_ENV,
 } from "./config"
-import { couchProxyRouter, photosRouter, usersRouter } from './controllers'
+import { couchProxyRouter, photosRouter, sharableRouter, usersRouter } from './controllers'
 import { createUsersDesignDoc, USERS_DB } from "./design_docs/users"
 import { createHorsesDesignDoc, HORSES_DB } from "./design_docs/horses"
 import { createRidesDesignDoc, RIDES_DB } from './design_docs/rides'
@@ -59,6 +59,7 @@ createRidesDesignDoc(slouch)
 app.use('/couchProxy', couchProxyRouter)
 app.use('/users', usersRouter)
 app.use('', photosRouter)
+app.use('', sharableRouter)
 
 const ESClient = new elasticsearch.Client({
   host: configGet(ELASTICSEARCH_HOST),
@@ -70,6 +71,10 @@ const ddbService = new DynamoDBService()
 
 startUsersChangeIterator(ESClient, slouch)
 startRideChangeIterator(slouch, gcmClient, ddbService)
+
+app.get('/', (req, res) => {
+  res.redirect('https://equesteo.com')
+})
 
 app.get('/errorTest', (req, res) => {
   throw new Error('Broke!');
@@ -126,7 +131,6 @@ app.get('/rideMap/:url', (req, res, next) => {
     }
   })
 })
-
 
 app.get('/replicateProd', async (req, res) => {
   if (configGet(NODE_ENV) !== 'local') {

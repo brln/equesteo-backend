@@ -10,6 +10,7 @@ export const LOGGING_TYPE = 'LOGGING_TYPE'
 export const MAPBOX_TOKEN = 'MAPBOX_TOKEN'
 export const NICOLE_USER_ID = 'NICOLE_USER_ID'
 export const NODE_ENV = 'NODE_ENV'
+export const OWN_URL = 'OWN_URL'
 export const SENDGRID_API_TOKEN = 'SENDGRID_API_TOKEN'
 export const TOP_SECRET_JWT_TOKEN = 'TOP_SECRET_JWT_TOKEN'
 
@@ -26,6 +27,7 @@ const defaults = {
   MAPBOX_TOKEN: 'pk.eyJ1IjoiZXF1ZXN0ZW8iLCJhIjoiY2puM3piMHp5MDJhdzNwbzNnOTQ0cGd1MiJ9.AxXk7ako6f4OMQZB9TUd2A',
   NICOLE_USER_ID: '19e0763a558cfa107eeec280631b1cc1',
   NODE_ENV: 'local',
+  OWN_URL: 'localhost:8080',
   PUSHER_KEY: 'dope',
   PUSHER_SECRET: 'fiend',
   SENDGRID_API_TOKEN: 'something,',

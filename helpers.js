@@ -162,6 +162,32 @@ export function refreshToken () {
   return text
 }
 
+function leftPad(num) {
+  const str = num.toString()
+  const pad = "00"
+  return pad.substring(0, pad.length - str.length) + str
+}
+
+export function timeToString (elapsed) {
+  const asHours = elapsed / 60 / 60
+  const justHours = Math.floor(asHours)
+  const minutes = (asHours - justHours) * 60
+  const justMinutes = Math.floor(minutes)
+  const seconds = (minutes - justMinutes) * 60
+  const roundedSeconds = Math.round(seconds)
+  return `${leftPad(justHours)}:${leftPad(justMinutes)}:${leftPad(roundedSeconds)}`
+}
+
+export function averageSpeed (elapsed, distance) {
+  if (elapsed > 0 && distance) {
+    const totalHours = elapsed / 60 / 60
+    const milesPerHour = distance / totalHours
+    return milesPerHour.toFixed(1).toString()
+  } else {
+    return '0.0'
+  }
+}
+
 export function newRideName (currentRide) {
   let name
   const hour = (new Date(currentRide.startTime)).getHours()
@@ -196,4 +222,51 @@ export function makeToken (id, email) {
     configGet(TOP_SECRET_JWT_TOKEN)
   )
   return { token, refreshToken: rt }
+}
+
+export function userName (firstName, lastName) {
+  if (firstName && lastName) {
+    return `${firstName} ${lastName}`
+  } else if (firstName || lastName) {
+    return firstName || lastName
+  } else {
+    return 'No Name'
+  }
+}
+
+export function speedGradient (speed) {
+  switch (Math.floor(speed)) {
+    case 0:
+      return "#5A35DE"
+    case 1:
+      return "#6432CF"
+    case 2:
+      return "#6E30C0"
+    case 3:
+      return "#782DB2"
+    case 4:
+      return "#822BA3"
+    case 5:
+      return "#8C2895"
+    case 6:
+      return "#962686"
+    case 7:
+      return "#A02378"
+    case 8:
+      return "#AA2169"
+    case 9:
+      return "#B41E5A"
+    case 10:
+      return "#BE1C4C"
+    case 11:
+      return "#C8193D"
+    case 12:
+      return "#D2172F"
+    case 13:
+      return "#DC1420"
+    case 14:
+      return "#E61212"
+    default:
+      return "#E61212"
+  }
 }

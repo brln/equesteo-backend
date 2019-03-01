@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset='utf-8' />
+    <title>Equesteo Sharable Map</title>
+    <meta name='viewport' content='initial-scale=1,maximum-scale=1,user-scalable=no' />
+    <script src='https://api.tiles.mapbox.com/mapbox-gl-js/v0.53.0/mapbox-gl.js'></script>
+    <link href='https://api.tiles.mapbox.com/mapbox-gl-js/v0.53.0/mapbox-gl.css' rel='stylesheet' />
+    <style>
+        @font-face {
+            font-family: "Montserrat";
+            src: url('https://s3-us-west-1.amazonaws.com/equesteo-sharable-map-assets/Montserrat-Regular.otf') format("truetype");
+        }
+        body { margin:0; padding:0; }
+        #map { width:800px; height:650px; }
+        #header { width:800px; height:150px; background-color: #5bc0eb}
+        .stat-font { font-family: Montserrat; }
+        .stat-header { font-size: 22px; text-underline: black; }
+        .stat-value { font-size: 35px }
+        .stat-box { padding-top: 35px; padding-left: 27px; }
+    </style>
+</head>
+
+<body>
+    <div id='main'></div>
+    <div id='header'>
+        <div class="stat-font" style="display: flex; flex-direction: row">
+            <img src="https://s3-us-west-1.amazonaws.com/equesteo-sharable-map-assets/logoWithName.png" style="height: 120px; padding-left: 20px; padding-top: 15px" />
+            <div class="stat-box">
+                <div class="stat-header">Date</div>
+                <div class="stat-value">{{startDate}}</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-header">Distance</div>
+                <div class="stat-value">{{distance}} mi</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-header">Time</div>
+                <div class="stat-value">{{rideTime}}</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-header">Avg. Speed</div>
+                <div class="stat-value">{{avgSpeed}} mph</div>
+            </div>
+        </div>
+    </div>
+    <div id='map'></div>
+
+    <script>
+    mapboxgl.accessToken = '{{ mapboxToken }}';
+    var map = new mapboxgl.Map({
+        container: 'map',
+        style: 'mapbox://styles/equesteo/cjopu37k3fm442smn4ncz3x9m',
+        zoom: 15,
+        preserveDrawingBuffer: true
+    });
+
+    map.on('load', function () {
+        var geoJson = {{{ featureCollection }}}
+        map.addLayer({
+            "id": "route",
+            "type": "line",
+            "source": {
+                "type": "geojson",
+                "data": geoJson
+            },
+            "layout": {
+                "line-join": "round",
+                "line-cap": "round"
+            },
+            "paint": {
+                "line-color": ['get', 'stroke'],
+                "line-width": 8
+            }
+        });
+        // Geographic coordinates of the LineString
+        var coordinates = geoJson.features
+        var firstPair = coordinates[0].geometry.coordinates[0]
+        var bounds = coordinates.reduce(function(bounds, coord) {
+            return bounds.extend(coord.geometry.coordinates[0]);
+        }, new mapboxgl.LngLatBounds(firstPair, firstPair));
+
+        console.log('fitting bounds')
+
+        map.once('zoomend', function () {
+            map.once('idle', function () {
+                var div = document.createElement("div");
+                div.id ='done'
+                var found = document.getElementById("main")
+                found.appendChild(div);
+                console.log('and donesies')
+                console.log(document.getElementById('done').id)
+            })
+        })
+        map.fitBounds(bounds, {
+            padding: { bottom: 10, top: 10, left: 10, right: 10 },
+            duration: 0,
+        })
+    });
+    </script>
+
+</body>
+</html>

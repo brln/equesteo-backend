@@ -5,7 +5,7 @@ import * as Sentry from '@sentry/node'
 import { HORSES_DB, HORSES_DESIGN_DOC } from "../design_docs/horses"
 import { RIDES_DB, RIDES_DESIGN_DOC } from "../design_docs/rides"
 import { USERS_DB, USERS_DESIGN_DOC } from "../design_docs/users"
-import { unixTimeNow } from '../helpers'
+import { unixTimeNow, userName } from '../helpers'
 import {calcLeaderboards, summarizeRides} from './helpers'
 import { configGet, COUCH_USERNAME, COUCH_PASSWORD, COUCH_HOST } from '../config'
 import CouchService from '../services/Couch'
@@ -269,7 +269,7 @@ function newCarrotNotification(carrotRecord, slouch, gcmClient, ddbService) {
                   data: {
                     type: 'newCarrot',
                     carrotRideID: carrotRecord.doc.rideID,
-                    carroterName: `${carrotUser.firstName} ${carrotUser.lastName}`,
+                    carroterName: userName(carrotUser.firstName, carrotUser.lastName),
                   },
                   priority: 'high'
                 });
@@ -331,10 +331,11 @@ function newRideNotification (rideRecord, slouch, gcmClient, ddbService) {
             type: 'newRide',
             rideID: rideRecord.doc._id,
             userID: rideRecord.doc.userID,
-            userName: `${foundUser.firstName} ${foundUser.lastName}`,
+            userName: userName(foundUser.firstName, foundUser.lastName),
             distance: rideRecord.doc.distance,
           },
-          priority: 'high'
+          content_available: true,
+          priority: "high",
         });
         gcmClient.send(
           message,
@@ -402,7 +403,7 @@ function newCommentNotification (commentRecord, slouch, gcmClient, ddbService) {
           data: {
             type: 'newComment',
             commentRideID: commentRecord.doc.rideID,
-            commenterName: `${foundUser.firstName} ${foundUser.lastName}`,
+            commenterName: userName(foundUser.firstName, foundUser.lastName),
             comment: commentRecord.doc.comment
           },
           priority: 'high'
