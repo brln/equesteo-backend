@@ -40,7 +40,8 @@ function createMapPage (rideName, imagePath, shareLink, key) {
   const params = {
     Bucket: PAGE_BUCKET,
     Key: `${key}.html`,
-    Body: Buffer.from(asHTML)
+    Body: Buffer.from(asHTML),
+    ContentType: 'image/png'
   }
   return new Promise ((res, rej) => {
     s3.upload(params, (s3Err, data) => {
@@ -62,6 +63,7 @@ function createMap (rideData, bucket, key, filename) {
     mapboxToken: configGet(MAPBOX_TOKEN),
     rideTime: rideData.rideTime,
     startDate: rideData.startDate,
+    rideName: rideData.rideName
   })
   return pupeteer.launch({'args' : [ '--disable-web-security' ]}).then(browser => {
     return browser.newPage().then(page => {
@@ -119,6 +121,7 @@ router.post('/sharableMap', authenticator, bodyParser.json(), (req, res, next) =
   const key = murmur.murmur3(id + rev, 'equesteo-sharable-map-url').toString()
   const filename = `${key}.png`
   const link = shareLink(key)
+  const rideName = req.body.name || 'Equesteo Ride'
 
   const s3Service = new S3Service()
   let returnData
@@ -135,11 +138,12 @@ router.post('/sharableMap', authenticator, bodyParser.json(), (req, res, next) =
         distance: req.body.distance.toFixed(1),
         rideTime: timeToString(req.body.rideTime),
         avgSpeed: averageSpeed(req.body.rideTime, req.body.distance),
+        rideName,
       }
       createMap(rideData, IMAGE_BUCKET, key, filename).then(_returnData => {
         returnData = _returnData
         const imagePath = `https://s3-us-west-1.amazonaws.com/${IMAGE_BUCKET}/${filename}`
-        return createMapPage(req.body.name, imagePath, link, key)
+        return createMapPage(rideName, imagePath, link, key)
       }).then(() => {
         res.json(returnData)
       }).catch(e => {

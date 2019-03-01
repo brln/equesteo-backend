@@ -14,9 +14,19 @@
         #map { width:1080px; height:880px; }
         #header { width:1080px; height:200px; background-color: #5bc0eb}
         .stat-font { font-family: Montserrat; }
-        .stat-header { font-size: 30px; text-underline: black; }
-        .stat-value { font-size: 40px }
-        .stat-box { padding-top: 60px; padding-left: 27px; }
+        .stat-header { font-size: 24px; text-underline: black; }
+        .stat-value { font-size: 30px; }
+        .stat-box { padding-top: 20px; padding-left: 35px; }
+        .title {
+            font-size: 40px;
+            padding-left: 35px;
+            padding-top: 27px;
+            width: 850px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .mapbox-improve-map { display: none; }
     </style>
 </head>
 
@@ -24,26 +34,56 @@
     <div id='main'></div>
     <div id='header'>
         <div class="stat-font" style="display: flex; flex-direction: row">
-            <img src="https://s3-us-west-1.amazonaws.com/equesteo-sharable-map-assets/logoWithName.png" style="height: 180px; padding-left: 20px; padding-top: 15px" />
-            <div class="stat-box">
-                <div class="stat-header">Date</div>
-                <div class="stat-value">{{startDate}}</div>
+            <div>
+                <img src="https://s3-us-west-1.amazonaws.com/equesteo-sharable-map-assets/logoWithName.png" style="height: 180px; padding-left: 20px; padding-top: 15px" />
             </div>
-            <div class="stat-box">
-                <div class="stat-header">Distance</div>
-                <div class="stat-value">{{distance}} mi</div>
-            </div>
-            <div class="stat-box">
-                <div class="stat-header">Time</div>
-                <div class="stat-value">{{rideTime}}</div>
-            </div>
-            <div class="stat-box">
-                <div class="stat-header">Avg. Speed</div>
-                <div class="stat-value">{{avgSpeed}} mph</div>
+
+            <div style="display: flex; flex-direction: column;">
+                <div class="title">{{rideName}}</div>
+                <div style="display: flex; flex-direction: row;">
+                    <div class="stat-box">
+                        <div class="stat-header">Date</div>
+                        <div class="stat-value">{{startDate}}</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-header">Distance</div>
+                        <div class="stat-value">{{distance}}</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-header">Time</div>
+                        <div class="stat-value">{{rideTime}}</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-header">Avg. Speed</div>
+                        <div class="stat-value">{{avgSpeed}}</div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
     <div id='map'></div>
+    <div style="position: absolute; left: 125px; bottom: 10px">
+        <div style="display: flex; flex-direction: row">
+            <div class="stat-font" style="margin-right: 10px">0 mph</div>
+            <div style="width: 20px; height: 20px; background-color: #5A35DE" ></div>
+            <div style="width: 20px; height: 20px; background-color: #6432CF" ></div>
+            <div style="width: 20px; height: 20px; background-color: #6E30C0" ></div>
+            <div style="width: 20px; height: 20px; background-color: #782DB2" ></div>
+            <div style="width: 20px; height: 20px; background-color: #822BA3" ></div>
+            <div style="width: 20px; height: 20px; background-color: #8C2895" ></div>
+            <div style="width: 20px; height: 20px; background-color: #962686" ></div>
+            <div style="width: 20px; height: 20px; background-color: #A02378" ></div>
+            <div style="width: 20px; height: 20px; background-color: #AA2169" ></div>
+            <div style="width: 20px; height: 20px; background-color: #B41E5A" ></div>
+            <div style="width: 20px; height: 20px; background-color: #BE1C4C" ></div>
+            <div style="width: 20px; height: 20px; background-color: #C8193D" ></div>
+            <div style="width: 20px; height: 20px; background-color: #D2172F" ></div>
+            <div style="width: 20px; height: 20px; background-color: #DC1420" ></div>
+            <div style="width: 20px; height: 20px; background-color: #E61212" ></div>
+            <div style="width: 20px; height: 20px; background-color: #E61212" ></div>
+            <div class="stat-font" style="margin-left: 10px">15 mph</div>
+        </div>
+    </div>
 
     <script>
     mapboxgl.accessToken = '{{ mapboxToken }}';
@@ -80,19 +120,17 @@
         }, new mapboxgl.LngLatBounds(firstPair, firstPair));
 
         console.log('fitting bounds')
-
         map.once('zoomend', function () {
             map.once('idle', function () {
                 var div = document.createElement("div");
                 div.id ='done'
                 var found = document.getElementById("main")
                 found.appendChild(div);
-                console.log('and donesies')
                 console.log(document.getElementById('done').id)
             })
         })
         map.fitBounds(bounds, {
-            padding: { bottom: 50, top: 30, left: 30, right: 30 },
+            padding: { bottom: 120, top: 100, left: 100, right: 100 },
             duration: 0,
         })
     });

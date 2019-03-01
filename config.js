@@ -27,7 +27,7 @@ const defaults = {
   MAPBOX_TOKEN: 'pk.eyJ1IjoiZXF1ZXN0ZW8iLCJhIjoiY2puM3piMHp5MDJhdzNwbzNnOTQ0cGd1MiJ9.AxXk7ako6f4OMQZB9TUd2A',
   NICOLE_USER_ID: '19e0763a558cfa107eeec280631b1cc1',
   NODE_ENV: 'local',
-  OWN_URL: 'localhost:8080',
+  OWN_URL: 'http://localhost:8080',
   PUSHER_KEY: 'dope',
   PUSHER_SECRET: 'fiend',
   SENDGRID_API_TOKEN: 'something,',
