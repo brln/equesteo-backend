@@ -236,37 +236,55 @@ export function userName (firstName, lastName) {
 
 export function speedGradient (speed) {
   switch (Math.floor(speed)) {
-    case 0:
-      return "#5A35DE"
     case 1:
-      return "#6432CF"
+      return "#5A35DE"
     case 2:
-      return "#6E30C0"
+      return "#6532CD"
     case 3:
-      return "#782DB2"
+      return "#712FBC"
     case 4:
-      return "#822BA3"
+      return "#7D2CAB"
     case 5:
-      return "#8C2895"
+      return "#88299A"
     case 6:
-      return "#962686"
+      return "#942689"
     case 7:
       return "#A02378"
     case 8:
-      return "#AA2169"
+      return "#AB2066"
     case 9:
-      return "#B41E5A"
+      return "#B71D56"
     case 10:
-      return "#BE1C4C"
+      return "#C31A45"
     case 11:
-      return "#C8193D"
+      return "#CE1733"
     case 12:
-      return "#D2172F"
+      return "#DA1423"
     case 13:
-      return "#DC1420"
+      return "#E61212"
     case 14:
-      return "#E61212"
+      return "#E62317"
+    case 15:
+      return "#E6341C"
+    case 16:
+      return "#E74521"
+    case 17:
+      return "#E75727"
+    case 18:
+      return "#E7682C"
+    case 19:
+      return "#E87931"
+    case 20:
+      return "#E88A36"
+    case 21:
+      return "#E89C3C"
+    case 22:
+      return "#E9AD41"
+    case 23:
+      return "#E9BE46"
+    case 24:
+      return "#E9CF4B"
     default:
-      return "#E61212"
+      return "#EAE151"
   }
 }
