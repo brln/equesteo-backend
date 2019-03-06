@@ -73,8 +73,12 @@ function recalcTrainingRecords(rideRecord, slouch) {
     // Find all the horses that went on that ride
     const horseIDs = []
     const userIDs = [userID]
+    let riderHorseID
     slouch.db.view(RIDES_DB, RIDES_DESIGN_DOC, 'rideHorsesByRide', {include_docs: true, key: `"${rideID}"`}).each((rideHorse) => {
       horseIDs.push(rideHorse.doc.horseID)
+      if (rideHorse.doc.rideHorseType === 'rider') {
+        riderHorseID = rideHorse.doc.horseID
+      }
     }).then(() => {
 
       // And all the users that ride those horses
@@ -97,6 +101,7 @@ function recalcTrainingRecords(rideRecord, slouch) {
         userID: userID,
         elevationGain: elevations.elevationGain,
         horseIDs,
+        riderHorseID,
       }
       const jsonUserIDs = JSON.stringify(userIDs)
       return slouch.db.view(USERS_DB, USERS_DESIGN_DOC, 'trainingsByUserID', {include_docs: true, keys: jsonUserIDs}).each(training => {
