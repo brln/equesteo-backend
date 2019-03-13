@@ -54,6 +54,7 @@ export function createRidesDesignDoc (slouch) {
       filters: {
         byUserIDs: function (doc, req) {
           let userIDs = req.query.userIDs.split(',');
+          let ownID = req.query.ownUserID
           let followerIDs = req.query.followerUserIDs.split(',');
           if (doc.deleted) {
             return false;
@@ -61,7 +62,8 @@ export function createRidesDesignDoc (slouch) {
             return userIDs.indexOf(doc.userID) >= 0
               || (doc.type === 'comment' && followerIDs.indexOf(doc.userID) >= 0)
               || (doc.type === 'ridePhoto' && followerIDs.indexOf(doc.userID) >= 0)
-              || (doc.type === 'rideHorse' && followerIDs.indexOf(doc.userID) >= 0);
+              || (doc.type === 'rideHorse' && followerIDs.indexOf(doc.userID) >= 0)
+              || (doc.type === 'rideAtlasEntry' && doc.userID === ownID)
           }
         }.toString()
       }

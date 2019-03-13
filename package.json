@@ -21,7 +21,6 @@
     "couch-slouch": "^1.0.4",
     "elasticsearch": "^15.1.1",
     "express": "^4.16.3",
-    "express-http-proxy": "^1.2.0",
     "jsonwebtoken": "^8.2.1",
     "mapbox-gl": "^0.53.0",
     "moment": "^2.22.2",
@@ -33,6 +32,7 @@
     "node-gcm": "^1.0.2",
     "puppeteer": "^1.12.2",
     "react-scripts": "^1.1.4",
+    "request": "^2.88.0",
     "sharp": "^0.21.1"
   }
 }

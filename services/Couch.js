@@ -1,65 +1,116 @@
-import fetch from 'node-fetch'
+import request from 'request'
+import querystring from 'querystring'
+
+const GET = 'get'
+const POST = 'post'
+const PUT = 'put'
 
 export default class CouchService {
   constructor (username, password, host) {
     this.username = username
     this.password = password
     this.host = host
+
+    this.root = `http://${this.username}:${this.password}@${this.host}`
   }
 
-  root() {
-    return `http://${this.username}:${this.password}@${this.host}`
+  getInfo () {
+    return request(this.root)
   }
 
-  getAllUsers(ids) {
-    return this.request(`${this.root()}/users/_all_docs?include_docs=true&keys=${JSON.stringify(ids)}`)
+  getLocalDoc (db, id, qs) {
+    return this.request(GET, `/${db}/_local/${id}`, qs)
   }
+
+  putLocalDoc (db, id, qs) {
+    return this.request(PUT, `/${db}/_local/${id}`, qs)
+  }
+
+  getRevDiffs (db, qs) {
+    return this.request(GET, `/${db}/_revs_diff`, qs)
+  }
+
+  postRevDiffs (db, qs) {
+    return this.request(POST, `/${db}/_revs_diff`, qs)
+  }
+
+  getView (db, designDoc, view, qs) {
+    return this.request(GET, `/${db}/_design/${designDoc}/_view/${view}`, qs)
+  }
+
+  postView (db, designDoc, view, qs) {
+    return this.request(POST, `/${db}/_design/${designDoc}/_view/${view}`, qs)
+  }
+
+  postChanges (db, qs) {
+    return this.request(POST, `/${db}/_changes`, qs)
+  }
+
+  getChanges (db, qs) {
+    return this.request(GET, `/${db}/_changes`, qs)
+  }
+
+  postAllDocs (db, qs) {
+    return this.request(POST, `/${db}/_all_docs`, qs)
+  }
+
+  postBulkDocs (db, qs) {
+    return this.request(POST, `/${db}/_bulk_docs`, qs)
+  }
+
+  postBulkGet (db, qs) {
+    return this.request(POST, `/${db}/_bulk_get`, qs)
+  }
+
+  getItem (db, id, qs) {
+    return this.request(GET, `/${db}/${id}`, qs)
+  }
+
 
   getLeaderboardOptOutUsers() {
-    return this.request(`${this.root()}/users/_design/users/_view/leaderboardOptOuts`)
+    const url = `/users/_design/users/_view/leaderboardOptOuts`
+    return this.request(GET, url, {}, false)
   }
 
   getAllRides(ids=[]) {
-    const url = `${this.root()}/rides/_design/rides/_view/rideData?include_docs=true`
+    const url = `/rides/_design/rides/_view/rideData`
     if (ids.length > 0) {
-      return this.request(url, {
-        headers: { 'Content-Type': 'application/json' },
-        method: 'post',
-        body: JSON.stringify({
-          keys: ids
-        })
+      return this.request(POST, url, {include_docs: true}, false, {keys: ids})
+    } else {
+      return this.request(GET, url, {include_docs: true}, false)
+    }
+  }
+
+  request (method, endpoint, qs={}, asStream=true, body=null) {
+    const uri = `${this.root}${endpoint}?${querystring.stringify(qs)}`
+    if (asStream) {
+      return request({
+        method,
+        uri,
+        forever: true,
       })
     } else {
-      return this.request(url)
+      return new Promise((res, rej) => {
+        const opts = {
+          method,
+          uri,
+          forever: true,
+        }
+        if (method === POST && body) {
+          opts.json = body
+        }
+        request(opts, (err, response, respBody) => {
+          if (err) {
+            rej(err)
+          } else {
+            if (body) {
+              res(respBody)
+            } else {
+              res(JSON.parse(respBody))
+            }
+          }
+        })
+      })
     }
-  }
-
-  createDatabase (name) {
-    return this.request(`${this.root()}/${name}`, {method: 'put'})
-  }
-
-  deleteDatabase (name) {
-    return this.request(`${this.root()}/${name}`, {method: 'delete'})
-  }
-
-  startReplication (dbName, sourceDB) {
-    const url = `${this.root()}/_replicate`
-    const opts = {
-      method: 'post',
-      body: JSON.stringify({
-        source: sourceDB.root() + `/${dbName}`,
-        target: this.root() + `/${dbName}`,
-      }),
-      headers: { 'Content-Type': 'application/json' }
-    }
-    return this.request(url, opts)
-  }
-
-  request (endpoint, opts={}) {
-    return fetch(endpoint, opts).then(resp => {
-      return resp.json()
-    }).then(json => {
-      return json
-    })
   }
 }

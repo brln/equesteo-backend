@@ -18,14 +18,14 @@ export function createUsersDesignDoc (slouch) {
         },
         following: {
           map: function (doc) {
-            if (doc.type === 'follow') {
+            if (doc.type === 'follow' && doc.deleted !== true) {
               emit(doc.followerID, doc.followingID);
             }
           }.toString()
         },
         followers: {
           map: function (doc) {
-            if (doc.type === 'follow') {
+            if (doc.type === 'follow' && doc.deleted !== true) {
               emit(doc.followingID, doc.followerID );
             }
           }.toString()

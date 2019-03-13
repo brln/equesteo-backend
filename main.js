@@ -36,8 +36,8 @@ const app = express()
 app.use(logger(configGet(LOGGING_TYPE)))
 
 if (configGet(NODE_ENV) !== 'local') {
-  Sentry.init({dsn: 'https://04b0f2944b3d43af8fc7d039a8bb6359@sentry.io/1305626'});
-  app.use(Sentry.Handlers.requestHandler());
+  Sentry.init({dsn: 'https://04b0f2944b3d43af8fc7d039a8bb6359@sentry.io/1305626'})
+  app.use(Sentry.Handlers.requestHandler())
 }
 
 aws.config.update({
