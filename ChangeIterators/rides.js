@@ -162,9 +162,17 @@ function recalcTrainingRecords(rideRecord, slouch) {
       const rideHorses = training.doc.rides[training.value].horseIDs
       const foundHorseIndex = rideHorses.indexOf(horseID)
       if (rideRecord.doc.deleted && foundHorseIndex >= 0) {
+        // If the ride horse was removed and it's on the training record
         rideHorses.splice(foundHorseIndex, 1)
+        if (training.doc.rides[training.value].riderHorseID === horseID) {
+          training.doc.rides[training.value].riderHorseID = null
+        }
       } else if (rideRecord.doc.deleted !== true && foundHorseIndex < 0) {
+        // If the ride horse was added
         rideHorses.push(horseID)
+        if (rideRecord.doc.rideHorseType === 'rider') {
+          training.doc.rides[training.value].riderHorseID = horseID
+        }
       }
 
       console.log('saving training from rideHorse')
