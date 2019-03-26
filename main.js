@@ -26,11 +26,13 @@ import { couchProxyRouter, photosRouter, sharableRouter, usersRouter } from './c
 import { createUsersDesignDoc, USERS_DB } from "./design_docs/users"
 import { createHorsesDesignDoc, HORSES_DB } from "./design_docs/horses"
 import { createRidesDesignDoc, RIDES_DB } from './design_docs/rides'
+import { createNotificationsDesignDoc } from "./design_docs/notifications"
 
 import startRideChangeIterator from './ChangeIterators/rides'
 import startUsersChangeIterator from './ChangeIterators/users'
 import DynamoDBService from './services/dynamoDB'
 import S3Service from './services/s3'
+
 
 const app = express()
 app.use(logger(configGet(LOGGING_TYPE)))
@@ -54,6 +56,7 @@ const slouch = new Slouch(
 createUsersDesignDoc(slouch)
 createHorsesDesignDoc(slouch)
 createRidesDesignDoc(slouch)
+createNotificationsDesignDoc(slouch)
 
 // Create endpoints
 app.use('/couchProxy', couchProxyRouter)

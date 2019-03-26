@@ -3,10 +3,11 @@ import gcm from 'node-gcm'
 import * as Sentry from '@sentry/node'
 
 import { HORSES_DB, HORSES_DESIGN_DOC } from "../design_docs/horses"
+import { NOTIFICATIONS_DB} from "../design_docs/notifications"
 import { RIDES_DB, RIDES_DESIGN_DOC } from "../design_docs/rides"
 import { USERS_DB, USERS_DESIGN_DOC } from "../design_docs/users"
-import { unixTimeNow, userName } from '../helpers'
-import {calcLeaderboards, summarizeRides} from './helpers'
+import { unixTimeNow, userName, randU32Sync } from '../helpers'
+import {calcLeaderboards, summarizeRides } from './helpers'
 import { configGet, COUCH_USERNAME, COUCH_PASSWORD, COUCH_HOST } from '../config'
 import CouchService from '../services/Couch'
 
@@ -268,6 +269,8 @@ function calcTrainingRecords (slouch) {
 }
 
 function newCarrotNotification(carrotRecord, slouch, gcmClient, ddbService) {
+  let rideUser
+  let carrotUser
   if (carrotRecord.doc && carrotRecord.doc.type === 'carrot'
     && carrotRecord.doc._rev.split('-')[0] === '1') {
       slouch.doc.get(RIDES_DB, carrotRecord.doc.rideID, {include_docs: true}).then(ride => {
@@ -275,7 +278,21 @@ function newCarrotNotification(carrotRecord, slouch, gcmClient, ddbService) {
           Promise.all([
             slouch.doc.get(USERS_DB, ride.userID),
             slouch.doc.get(USERS_DB, carrotRecord.doc.userID)
-          ]).then(([rideUser, carrotUser]) => {
+          ]).then(([_rideUser, _carrotUser]) => {
+            rideUser = _rideUser
+            carrotUser = _carrotUser
+            const newNotification = {
+              type: 'notification',
+              notificationType: 'newCarrot',
+              notificationID: randU32Sync(),
+              userID: ride.userID,
+              rideID: carrotRecord.doc.rideID,
+              carroterName: userName(carrotUser.firstName, carrotUser.lastName),
+              seen: false,
+              popped: false,
+            }
+            slouch.doc.upsert(NOTIFICATIONS_DB, newNotification)
+          }).then(() => {
             ddbService.getItem(TABLE_NAME, {id: {S: rideUser._id}}).then(ddbUser => {
               if (ddbUser && ddbUser.fcmToken) {
                 const message = new gcm.Message({
@@ -324,15 +341,38 @@ function newRideNotification (rideRecord, slouch, gcmClient, ddbService) {
       {key: `"${userID}"`}
     )
     const userPromise = slouch.doc.get(USERS_DB, rideRecord.doc.userID)
-    let foundUser
-    Promise.all([followersPromise, userPromise]).then(([followers, userRecord]) => {
-      foundUser = userRecord
-      return Promise.all(followers.rows.map((followerFromView) => {
+    let userRecord
+    let followers
+    let ddbRecords
+    Promise.all([followersPromise, userPromise]).then(([_followers, _userRecord]) => {
+      userRecord = _userRecord
+      followers = _followers.rows.map(x => x.value)
+      return Promise.all(_followers.rows.map((followerFromView) => {
         return ddbService.getItem(TABLE_NAME, {id: {S: followerFromView.value}})
       }))
-    }).then((ddbRecords) => {
+    }).then((_ddbRecords) => {
+      ddbRecords = _ddbRecords
+      const saveRecords = []
+      for (let follower of followers) {
+        const newNotification = {
+          type: 'notification',
+          userID: follower,
+          notificationType: 'newRide',
+          notificationID: randU32Sync(),
+          rideID: rideRecord.doc._id,
+          rideUserID: rideRecord.doc.userID,
+          userName: userName(userRecord.firstName, userRecord.lastName),
+          distance: rideRecord.doc.distance,
+          name: rideRecord.doc.name,
+          seen: false,
+          popped: false,
+        }
+        saveRecords.push(slouch.doc.upsert(NOTIFICATIONS_DB, newNotification))
+      }
+      return Promise.all(saveRecords)
+    }).then(() => {
       const allTokens = ddbRecords.reduce((accum, ddbRecord) => {
-        if (ddbRecord && ddbRecord.fcmToken.S) {
+        if (ddbRecord && ddbRecord.fcmToken && ddbRecord.fcmToken.S) {
           accum.push(ddbRecord.fcmToken.S)
         }
         return accum
@@ -344,7 +384,7 @@ function newRideNotification (rideRecord, slouch, gcmClient, ddbService) {
             type: 'newRide',
             rideID: rideRecord.doc._id,
             userID: rideRecord.doc.userID,
-            userName: userName(foundUser.firstName, foundUser.lastName),
+            userName: userName(userRecord.firstName, userRecord.lastName),
             distance: rideRecord.doc.distance,
           },
           content_available: true,
@@ -381,17 +421,15 @@ function newCommentNotification (commentRecord, slouch, gcmClient, ddbService) {
       { key: `"${commentRecord.doc.rideID}"` }
     )
     let foundUser
+    let userIDs = {}
+    let ddbRecords
     const userPromise = slouch.doc.get(USERS_DB, commentRecord.doc.userID)
     Promise.all([ridePromise, commentUsersPromise, userPromise]).then(([ride, commentUsers, user]) => {
-      console.log('promises promises')
       foundUser = user
-      let userIDs = {}
       if (user._id !== ride.userID) {
         userIDs[ride.userID] = true
       }
       userIDs = Object.keys(commentUsers.rows.reduce((accum, commentUser) => {
-        const rideID = commentUser.key
-        const commentID = commentUser.id
         const commentorUserID = commentUser.value
         if (commentorUserID !== user._id) {
           accum[commentUser.value] = true
@@ -401,14 +439,31 @@ function newCommentNotification (commentRecord, slouch, gcmClient, ddbService) {
       return Promise.all(userIDs.map((userID) => {
         return ddbService.getItem(TABLE_NAME, {id: {S: userID}})
       }))
-    }).then(ddbRecords => {
+    }).then(_ddbRecords => {
+      ddbRecords = _ddbRecords
+      const saveRecords = []
+      for (let follower of userIDs) {
+        const newNotification = {
+          type: 'notification',
+          userID: follower,
+          notificationType: 'newComment',
+          notificationID: randU32Sync(),
+          rideID: commentRecord.doc.rideID,
+          commenterName: userName(foundUser.firstName, foundUser.lastName),
+          comment: commentRecord.doc.comment,
+          seen: false,
+          popped: false,
+        }
+        saveRecords.push(slouch.doc.upsert(NOTIFICATIONS_DB, newNotification))
+      }
+      return Promise.all(saveRecords)
+    }).then(() => {
       const allTokens = ddbRecords.reduce((accum, ddbRecord) => {
         if (ddbRecord && ddbRecord.fcmToken.S && ddbRecord.distribution && ddbRecord.distribution.N > 40) {
           accum.push(ddbRecord.fcmToken.S)
         }
         return accum
       }, [])
-      console.log(allTokens)
 
 
       if (allTokens.length) {

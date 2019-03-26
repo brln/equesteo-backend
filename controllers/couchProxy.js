@@ -17,18 +17,22 @@ const couchService = new CouchService(
 )
 
 const HORSE_DB = 'horses'
+const NOTIFICATIONS_DB = 'notifications'
 const RIDE_DB = 'rides'
 const USERS_DB = 'users'
 const VALID_DBS = [
   HORSE_DB,
+  NOTIFICATIONS_DB,
   RIDE_DB,
   USERS_DB
 ]
+const DB_REG = `:db(${VALID_DBS.join('|')})`
 
 const REQUIRED_FILTERS = {}
 REQUIRED_FILTERS[HORSE_DB] = '_doc_ids'
 REQUIRED_FILTERS[USERS_DB] = 'users/byUserIDs2'
 REQUIRED_FILTERS[RIDE_DB] = 'rides/byUserIDs'
+REQUIRED_FILTERS[NOTIFICATIONS_DB] = 'notifications/byUserIDs'
 
 
 function checkDB (req, res, next) {
@@ -52,52 +56,52 @@ router.get('/', authenticator, (req, res, next) => {
   req.pipe(couchService.getInfo()).pipe(res)
 })
 
-router.get('/:db(rides|horses|users)/_local/:id', authenticator, checkDB, (req, res, next) => {
+router.get(`/${DB_REG}/_local/:id`, authenticator, checkDB, (req, res, next) => {
   req.pipe(couchService.getLocalDoc(req.params.db, req.params.id, req.query)).pipe(res)
 })
 
-router.put('/:db(rides|horses|users)/_local/:id', authenticator, checkDB, (req, res, next) => {
+router.put(`/${DB_REG}/_local/:id`, authenticator, checkDB, (req, res, next) => {
   req.pipe(couchService.putLocalDoc(req.params.db, req.params.id, req.query)).pipe(res)
 })
 
-router.post('/:db(rides|horses|users)/_revs_diff', authenticator, checkDB, (req, res, next) => {
+router.post(`/${DB_REG}/_revs_diff`, authenticator, checkDB, (req, res, next) => {
   req.pipe(couchService.postRevDiffs(req.params.db, req.query)).pipe(res)
 })
 
-router.get('/:db(rides|horses|users)/_revs_diff', authenticator, checkDB, (req, res, next) => {
+router.get(`/${DB_REG}/_revs_diff`, authenticator, checkDB, (req, res, next) => {
   req.pipe(couchService.getRevDiffs(req.params.db, req.query)).pipe(res)
 })
 
-router.get('/:db(rides|horses|users)/_design/:designDoc/_view/:view', checkDB, authenticator, (req, res, next) => {
+router.get(`/${DB_REG}/_design/:designDoc/_view/:view`, checkDB, authenticator, (req, res, next) => {
   req.pipe(couchService.getView(req.params.db, req.params.designDoc, req.params.view, req.query)).pipe(res)
 })
 
-router.post('/:db(rides|horses|users)/_design/:designDoc/_view/:view', checkDB, authenticator, (req, res, next) => {
-  // Same thing as GET view but posts the ids when they don't fit in url
+router.post(`/${DB_REG}/_design/:designDoc/_view/:view`, checkDB, authenticator, (req, res, next) => {
+  // Same thing as GET view but posts the ids when they don`t fit in url
   req.pipe(couchService.postView(req.params.db, req.params.designDoc, req.params.view, req.query)).pipe(res)
 })
 
-router.post('/:db(rides|horses|users)/_changes', authenticator, checkDB, checkFilter, (req, res, next) => {
+router.post(`/${DB_REG}/_changes`, authenticator, checkDB, checkFilter, (req, res, next) => {
   req.pipe(couchService.postChanges(req.params.db, req.query)).pipe(res)
 })
 
-router.get('/:db(rides|horses|users)/_changes', authenticator, checkDB, checkFilter, (req, res, next) => {
+router.get(`/${DB_REG}/_changes`, authenticator, checkDB, checkFilter, (req, res, next) => {
   req.pipe(couchService.getChanges(req.params.db, req.query)).pipe(res)
 })
 
-router.post('/:db(rides|horses|users)/_all_docs', authenticator, checkDB, (req, res, next) => {
+router.post(`/${DB_REG}/_all_docs`, authenticator, checkDB, (req, res, next) => {
   req.pipe(couchService.postAllDocs(req.params.db, req.query)).pipe(res)
 })
 
-router.post('/:db(rides|horses|users)/_bulk_docs', authenticator, checkDB, (req, res, next) => {
+router.post(`/${DB_REG}/_bulk_docs`, authenticator, checkDB, (req, res, next) => {
   req.pipe(couchService.postBulkDocs(req.params.db, req.query)).pipe(res)
 })
 
-router.post('/:db(rides|horses|users)/_bulk_get', authenticator, checkDB, (req, res, next) => {
+router.post(`/${DB_REG}/_bulk_get`, authenticator, checkDB, (req, res, next) => {
   req.pipe(couchService.postBulkGet(req.params.db, req.query)).pipe(res)
 })
 
-router.get('/:db(rides|horses|users)/:id', authenticator, checkDB, (req, res, next) => {
+router.get(`/${DB_REG}/:id`, authenticator, checkDB, (req, res, next) => {
   console.log(req.params.id)
   req.pipe(couchService.getItem(req.params.db, req.params.id, req.query)).pipe(res)
 })
