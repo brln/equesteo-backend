@@ -81,7 +81,7 @@ app.get('/', (req, res) => {
 
 app.get('/errorTest', (req, res) => {
   throw new Error('Broke!');
-});
+})
 
 app.get('/unauthorizedTest', (req, res) => {
   console.log('unauthorized test')
@@ -90,6 +90,10 @@ app.get('/unauthorizedTest', (req, res) => {
 
 app.get('/checkAuth', authenticator, (req, res) => {
   return res.json({})
+})
+
+app.get('/checkConnection', authenticator, (req, res) => {
+  return res.json({connected: true})
 })
 
 

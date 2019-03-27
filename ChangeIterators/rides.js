@@ -1,5 +1,4 @@
 import moment from 'moment'
-import gcm from 'node-gcm'
 import * as Sentry from '@sentry/node'
 
 import { HORSES_DB, HORSES_DESIGN_DOC } from "../design_docs/horses"
@@ -10,6 +9,7 @@ import { unixTimeNow, userName, randU32Sync } from '../helpers'
 import {calcLeaderboards, summarizeRides } from './helpers'
 import { configGet, COUCH_USERNAME, COUCH_PASSWORD, COUCH_HOST } from '../config'
 import CouchService from '../services/Couch'
+import GCMService from '../services/GCM'
 
 const TABLE_NAME = 'equesteo_fcm_tokens'
 
@@ -58,6 +58,25 @@ class TrainingCache {
       cacheRefs[training.doc._id] = cacheRefs[training.doc._id] - 1
     }
   }
+}
+
+const gcmService = new GCMService()
+
+function getTokens (ddbRecords) {
+  return ddbRecords.reduce((accum, ddbRecord) => {
+    if (ddbRecord && ddbRecord.fcmToken && ddbRecord.fcmToken.S && ddbRecord.distribution) {
+      if (ddbRecord.platform && ddbRecord.platform.S) {
+        if (ddbRecord.platform.S === 'android') {
+          accum.android.push(ddbRecord.fcmToken.S)
+        } else if (ddbRecord.platform.S === 'ios') {
+          accum.ios.push(ddbRecord.fcmToken.S)
+        }
+      } else {
+        accum.android.push(ddbRecord.fcmToken.S)
+      }
+    }
+    return accum
+  }, {ios: [], android: []})
 }
 
 function recalcTrainingRecords(rideRecord, slouch) {
@@ -271,6 +290,7 @@ function calcTrainingRecords (slouch) {
 function newCarrotNotification(carrotRecord, slouch, gcmClient, ddbService) {
   let rideUser
   let carrotUser
+  const notificationID = randU32Sync()
   if (carrotRecord.doc && carrotRecord.doc.type === 'carrot'
     && carrotRecord.doc._rev.split('-')[0] === '1') {
       slouch.doc.get(RIDES_DB, carrotRecord.doc.rideID, {include_docs: true}).then(ride => {
@@ -284,7 +304,7 @@ function newCarrotNotification(carrotRecord, slouch, gcmClient, ddbService) {
             const newNotification = {
               type: 'notification',
               notificationType: 'newCarrot',
-              notificationID: randU32Sync(),
+              notificationID,
               userID: ride.userID,
               rideID: carrotRecord.doc.rideID,
               carroterName: userName(carrotUser.firstName, carrotUser.lastName),
@@ -294,29 +314,22 @@ function newCarrotNotification(carrotRecord, slouch, gcmClient, ddbService) {
             slouch.doc.upsert(NOTIFICATIONS_DB, newNotification)
           }).then(() => {
             ddbService.getItem(TABLE_NAME, {id: {S: rideUser._id}}).then(ddbUser => {
-              if (ddbUser && ddbUser.fcmToken) {
-                const message = new gcm.Message({
-                  data: {
-                    type: 'newCarrot',
-                    carrotRideID: carrotRecord.doc.rideID,
-                    carroterName: userName(carrotUser.firstName, carrotUser.lastName),
-                  },
-                  priority: 'high'
-                });
-                console.log(message)
-                gcmClient.send(
-                  message,
-                  {registrationTokens: [ddbUser.fcmToken.S]},
-                  (err, response) => {
-                    if (err) {
-                      console.log(err)
-                      throw err
-                    } else {
-                      console.log('FCM send response: ============')
-                      console.log(response);
-                    }
-                  }
-                );
+              if (ddbUser && ddbUser.fcmToken && ddbUser.fcmToken.S) {
+                const allTokens = {android: [], ios: []}
+                if (ddbUser.platform && ddbUser.platform.S && ddbUser.platform.S === 'ios') {
+                  allTokens.ios.push(ddbUser.fcmToken.S)
+                } else {
+                  allTokens.android.push(ddbUser.fcmToken.S)
+                }
+                const data = {
+                  type: 'newCarrot',
+                  carrotRideID: carrotRecord.doc.rideID,
+                  carroterName: userName(carrotUser.firstName, carrotUser.lastName),
+                  notificationID
+                }
+                const title = 'A Carrot'
+                const body = `You got a carrot from ${data.carroterName}`
+                gcmService.sendMessage(title, body, data, allTokens)
               }
             })
           })
@@ -344,6 +357,7 @@ function newRideNotification (rideRecord, slouch, gcmClient, ddbService) {
     let userRecord
     let followers
     let ddbRecords
+    const notificationID = randU32Sync()
     Promise.all([followersPromise, userPromise]).then(([_followers, _userRecord]) => {
       userRecord = _userRecord
       followers = _followers.rows.map(x => x.value)
@@ -358,7 +372,7 @@ function newRideNotification (rideRecord, slouch, gcmClient, ddbService) {
           type: 'notification',
           userID: follower,
           notificationType: 'newRide',
-          notificationID: randU32Sync(),
+          notificationID,
           rideID: rideRecord.doc._id,
           rideUserID: rideRecord.doc.userID,
           userName: userName(userRecord.firstName, userRecord.lastName),
@@ -371,38 +385,18 @@ function newRideNotification (rideRecord, slouch, gcmClient, ddbService) {
       }
       return Promise.all(saveRecords)
     }).then(() => {
-      const allTokens = ddbRecords.reduce((accum, ddbRecord) => {
-        if (ddbRecord && ddbRecord.fcmToken && ddbRecord.fcmToken.S) {
-          accum.push(ddbRecord.fcmToken.S)
-        }
-        return accum
-      }, [])
-
-      if (allTokens.length) {
-        const message = new gcm.Message({
-          data: {
-            type: 'newRide',
-            rideID: rideRecord.doc._id,
-            userID: rideRecord.doc.userID,
-            userName: userName(userRecord.firstName, userRecord.lastName),
-            distance: rideRecord.doc.distance,
-          },
-          content_available: true,
-          priority: "high",
-        });
-        gcmClient.send(
-          message,
-          {registrationTokens: allTokens},
-          (err, response) => {
-            if (err) {
-              throw err
-            } else {
-              console.log('FCM send response: ============')
-              console.log(response);
-            }
-          }
-        );
+      const allTokens = getTokens(ddbRecords)
+      const data = {
+        type: 'newRide',
+        rideID: rideRecord.doc._id,
+        userID: rideRecord.doc.userID,
+        userName: userName(userRecord.firstName, userRecord.lastName),
+        distance: rideRecord.doc.distance,
+        notificationID,
       }
+      const title = 'New Ride'
+      const body = `${data.userName} went for a ${data.distance.toFixed(1)} mile ride: ${rideRecord.doc.name}`
+      gcmService.sendMessage(title, body, data, allTokens)
     }).catch(e => {
       Sentry.captureException(e)
       console.log(e)
@@ -423,6 +417,7 @@ function newCommentNotification (commentRecord, slouch, gcmClient, ddbService) {
     let foundUser
     let userIDs = {}
     let ddbRecords
+    const notificationID = randU32Sync()
     const userPromise = slouch.doc.get(USERS_DB, commentRecord.doc.userID)
     Promise.all([ridePromise, commentUsersPromise, userPromise]).then(([ride, commentUsers, user]) => {
       foundUser = user
@@ -447,7 +442,7 @@ function newCommentNotification (commentRecord, slouch, gcmClient, ddbService) {
           type: 'notification',
           userID: follower,
           notificationType: 'newComment',
-          notificationID: randU32Sync(),
+          notificationID,
           rideID: commentRecord.doc.rideID,
           commenterName: userName(foundUser.firstName, foundUser.lastName),
           comment: commentRecord.doc.comment,
@@ -458,41 +453,18 @@ function newCommentNotification (commentRecord, slouch, gcmClient, ddbService) {
       }
       return Promise.all(saveRecords)
     }).then(() => {
-      const allTokens = ddbRecords.reduce((accum, ddbRecord) => {
-        if (ddbRecord && ddbRecord.fcmToken.S && ddbRecord.distribution && ddbRecord.distribution.N > 40) {
-          accum.push(ddbRecord.fcmToken.S)
-        }
-        return accum
-      }, [])
-
-
-      if (allTokens.length) {
-        const message = new gcm.Message({
-          data: {
-            type: 'newComment',
-            commentRideID: commentRecord.doc.rideID,
-            commenterName: userName(foundUser.firstName, foundUser.lastName),
-            comment: commentRecord.doc.comment
-          },
-          priority: 'high'
-        });
-        gcmClient.send(
-          message,
-          {registrationTokens: allTokens},
-          (err, response) => {
-            if (err) {
-              console.log(err)
-              console.log(response)
-              throw err
-            } else {
-              console.log('FCM send response: ============')
-              console.log(response);
-            }
-          }
-        );
-      } else {
-        console.log('no one to send alerts to :(')
+      const allTokens = getTokens(ddbRecords)
+      const title = 'New Comment'
+      const body = `${userName(foundUser.firstName, foundUser.lastName)} commented: ${commentRecord.doc.comment}`
+      // When everyone is on > 0.54.0 (97) can take out the data
+      const data = {
+        type: 'newComment',
+        commentRideID: commentRecord.doc.rideID,
+        commenterName: userName(foundUser.firstName, foundUser.lastName),
+        comment: commentRecord.doc.comment,
+        notificationID,
       }
+      gcmService.sendMessage(title, body, data, allTokens)
     }).catch((e) => {
       console.log(e)
     })

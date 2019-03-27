@@ -242,6 +242,7 @@ router.post('/changePW', authenticator, async (req, res) => {
 router.post('/setFCMToken', authenticator, (req, res, next) => {
   const id = req.body.id
   const fcmToken = req.body.token
+  const platform = req.body.platform
   const ddbService = new DynamoDBService()
   if (fcmToken && id) {
     ddbService.getItem(FCM_TABLE_NAME, { id: {S: id }}).then(found => {
@@ -249,6 +250,10 @@ router.post('/setFCMToken', authenticator, (req, res, next) => {
         found.fcmToken = {S: fcmToken}
       } else {
         found = { id: {S: id}, fcmToken: {S: fcmToken}}
+      }
+
+      if (platform) {
+        found['platform'] = {S: platform}
       }
       return ddbService.putItem(FCM_TABLE_NAME, found).then(() => {
         return res.json({})
