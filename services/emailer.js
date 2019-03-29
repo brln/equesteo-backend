@@ -4,6 +4,7 @@ import {
   configGet,
   SENDGRID_API_TOKEN,
 } from "../config"
+import Logging from './Logging'
 
 export default class EmailerService {
   constructor () {
@@ -27,7 +28,7 @@ export default class EmailerService {
     if (process.env.NODE_ENV === 'production') {
       await sgMail.send(msg);
     } else {
-      console.log(msg)
+      Logging.log(msg)
     }
   }
 

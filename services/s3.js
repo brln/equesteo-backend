@@ -1,5 +1,7 @@
 import aws from 'aws-sdk'
 
+import Logging from './Logging'
+
 export default class S3Service {
   constructor () {
     this.s3 = new aws.S3()
@@ -15,7 +17,7 @@ export default class S3Service {
             rej(err)
           }
         } else {
-          console.log(data)
+          Logging.log(data)
           res(true)
         }
       })

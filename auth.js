@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken'
 import { configGet, TOP_SECRET_JWT_TOKEN } from "./config"
 import { makeToken, unixTimeNow } from './helpers'
 import DynamoDBService from './services/dynamoDB'
+import Logging from './services/Logging'
 
 const USERS_TABLE_NAME = 'equesteo_users'
 const TOKEN_EXPIRATION = 1000 * 60 * 18
@@ -31,7 +32,7 @@ export const authenticator = (req, res, next) => {
 
     const timeDiff = unixTimeNow() - decoded.createdAt
     if (timeDiff > TOKEN_EXPIRATION) {
-      console.log('Token is expired, fetching a new one')
+      Logging.log('Token is expired, fetching a new one')
       const id = decoded.id
       const email = decoded.email
       const incomingRefreshToken = decoded.refreshToken
@@ -50,9 +51,9 @@ export const authenticator = (req, res, next) => {
         const foundNextToken = found.nextToken.S
         const foundOldToken = found.oldToken ? found.oldToken.S : null
 
-        console.log('incoming: ' + incomingRefreshToken)
-        console.log('found: ' + foundRefreshToken)
-        console.log('found old: ' + foundOldToken)
+        Logging.log('incoming: ' + incomingRefreshToken)
+        Logging.log('found: ' + foundRefreshToken)
+        Logging.log('found old: ' + foundOldToken)
         if (incomingRefreshToken === foundRefreshToken) {
           // The token is expired but we have the correct refresh token, this
           // is the happy path.
@@ -61,13 +62,13 @@ export const authenticator = (req, res, next) => {
             // DynamoDB, we need to return the same new token to all of them
             // or we end up in a race condition for what new token gets set
             // on the client.
-            console.log('token from cache')
+            Logging.log('token from cache')
             res.set('x-auth-token', refreshTokenCache[incomingRefreshToken])
             next()
           } else {
             const { token, refreshToken } = makeToken(id, email)
-            console.log('making new token: ' + token)
-            console.log('making new refreshToken: ' + refreshToken)
+            Logging.log('making new token: ' + token)
+            Logging.log('making new refreshToken: ' + refreshToken)
             refreshTokenCache[incomingRefreshToken] = token
             res.set('x-auth-token', token)
             found.refreshToken = { S: refreshToken }
@@ -77,7 +78,7 @@ export const authenticator = (req, res, next) => {
               if (!fetchCount[email]) {
                 delete refreshTokenCache[incomingRefreshToken]
               }
-              console.log('token cache cleared')
+              Logging.log('token cache cleared')
               next()
             }).catch(e => { next(e) })
           }
@@ -88,24 +89,24 @@ export const authenticator = (req, res, next) => {
           // token, they should succeed and get the same token back that the
           // earlier ones did. This old token can be used for TOKEN_ALLOWED_OVERLAP
           // seconds after the first time it's used, then is destroyed.
-          console.log('using an old token!')
+          Logging.log('using an old token!')
           res.set('x-auth-token', foundNextToken)
           if (!clearOldTokenTimeouts[incomingRefreshToken]) {
             clearOldTokenTimeouts[incomingRefreshToken] = setTimeout(() => {
-              console.log('clearing old token')
+              Logging.log('clearing old token')
               ddbService.getItem(USERS_TABLE_NAME, { email: {S: email }}).then(foundAgain => {
                 foundAgain.oldToken = { NULL: true }
                 foundAgain.nextToken = { NULL: true }
                 return ddbService.putItem(USERS_TABLE_NAME, found).then(() => {
                   delete clearOldTokenTimeouts[incomingRefreshToken]
-                  console.log('old token cleared')
+                  Logging.log('old token cleared')
                 })
               }).catch(e => { next(e) })
             }, TOKEN_ALLOWED_OVERLAP)
           }
           next()
         } else {
-          console.log('attempted auth with expired token')
+          Logging.log('attempted auth with expired token')
           return res.status(401).json({error: 'Bad Token.'})
         }
       }).catch(e => {

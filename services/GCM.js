@@ -1,6 +1,7 @@
 import gcm from 'node-gcm'
 
 import { configGet, GCM_API_KEY } from "../config"
+import Logging from './Logging'
 
 export default class GCMService {
   constructor () {
@@ -19,12 +20,12 @@ export default class GCMService {
         {registrationTokens: tokens.android},
         (err, response) => {
           if (err) {
-            console.log(err)
-            console.log(response)
+            Logging.log(err)
+            Logging.log(response)
             throw err
           } else {
-            console.log('Android send response: ============')
-            console.log(response);
+            Logging.log('Android send response: ============')
+            Logging.log(response);
           }
         }
       )
@@ -42,12 +43,12 @@ export default class GCMService {
         {registrationTokens: tokens.ios},
         (err, response) => {
           if (err) {
-            console.log(err)
-            console.log(response)
+            Logging.log(err)
+            Logging.log(response)
             throw err
           } else {
-            console.log('iOS message send response: ============')
-            console.log(response);
+            Logging.log('iOS message send response: ============')
+            Logging.log(response);
           }
         }
       )
@@ -67,12 +68,12 @@ export default class GCMService {
         {registrationTokens: tokens.ios},
         (err, response) => {
           if (err) {
-            console.log(err)
-            console.log(response)
+            Logging.log(err)
+            Logging.log(response)
             throw err
           } else {
-            console.log('iOS notification send response: ============')
-            console.log(response);
+            Logging.log('iOS notification send response: ============')
+            Logging.log(response);
           }
         }
       )

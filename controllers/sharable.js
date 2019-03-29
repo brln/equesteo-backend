@@ -17,6 +17,7 @@ import {
   timeToString
 } from '../helpers'
 import { S3Service } from '../services'
+import Logging from '../services/Logging'
 
 const s3 = new aws.S3()
 
@@ -75,7 +76,7 @@ function createMap (rideData, bucket, key, filename) {
       }).then(() => {
         return page.screenshot({fullPage: true})
       }).then((imageBuffer) => {
-        console.log('uploading')
+        Logging.log('uploading')
         const params = {
           Bucket: bucket,
           Key: filename,
@@ -110,7 +111,7 @@ router.get('/sharableMap/:key', (req, res, next) => {
     res.type('text/html')
     res.send(new Buffer(s3Resp.Body))
   }).catch(e => {
-    console.log(e)
+    Logging.log(e)
     res.send(404)
   })
 })

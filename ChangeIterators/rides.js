@@ -10,6 +10,7 @@ import {calcLeaderboards, summarizeRides } from './helpers'
 import { configGet, COUCH_USERNAME, COUCH_PASSWORD, COUCH_HOST } from '../config'
 import CouchService from '../services/Couch'
 import GCMService from '../services/GCM'
+import Logging from '../services/Logging'
 
 const TABLE_NAME = 'equesteo_fcm_tokens'
 
@@ -29,7 +30,7 @@ export default function startRideChangeIterator(slouch, gcmClient, ddbService) {
 
   calcTrainingRecords(slouch)
   iterator.each((rideRecord) => {
-    console.log('ride change iterator running')
+    Logging.log('ride change iterator running')
 
     newRideNotification(rideRecord, slouch, gcmClient, ddbService)
     newCommentNotification(rideRecord, slouch, gcmClient, ddbService)
@@ -85,7 +86,7 @@ function recalcTrainingRecords(rideRecord, slouch) {
   if (rideRecord.doc && rideRecord.doc.type === 'ride'
       && rideRecord.doc._rev.split('-')[0] === '1'
       && rideRecord.doc.isPublic === true) {
-    console.log('new ride training recalc')
+    Logging.log('new ride training recalc')
     leaderboardRecalc = true
     const rideID = rideRecord.doc._id
     const userID = rideRecord.doc.userID
@@ -127,14 +128,14 @@ function recalcTrainingRecords(rideRecord, slouch) {
       return slouch.db.view(USERS_DB, USERS_DESIGN_DOC, 'trainingsByUserID', {include_docs: true, keys: jsonUserIDs}).each(training => {
         training = TrainingCache.check(training)
         training.doc.rides.push(newRec)
-        console.log('saving training from new ride')
+        Logging.log('saving training from new ride')
         return slouch.doc.upsert(USERS_DB, training.doc).then(() => {
           TrainingCache.updateOrInvalidate(training)
         })
       }).then(() => {
-        console.log('new ride training record update complete')
+        Logging.log('new ride training record update complete')
       }).catch(e => {
-        console.log(e)
+        Logging.log(e)
       })
     })
 
@@ -142,7 +143,7 @@ function recalcTrainingRecords(rideRecord, slouch) {
   } else if (rideRecord.doc && rideRecord.doc.type === 'ride'
     && parseInt(rideRecord.doc._rev.split('-')[0]) > 1
     && rideRecord.doc.isPublic === true) {
-    console.log('ride update training recalc')
+    Logging.log('ride update training recalc')
     leaderboardRecalc = true
     const key = `"${rideRecord.doc._id}"`
 
@@ -158,20 +159,20 @@ function recalcTrainingRecords(rideRecord, slouch) {
         ride.distance = rideRecord.doc.distance
         ride.deleted = rideRecord.doc.deleted
         ride.elevationGain = elevations.elevationGain
-        console.log('saving training from ride update')
+        Logging.log('saving training from ride update')
         return slouch.doc.upsert(USERS_DB, training.doc).then(() => {
           TrainingCache.updateOrInvalidate(training)
         })
       })
     }).then(() => {
-      console.log('update ride training record update complete')
+      Logging.log('update ride training record update complete')
     }).catch(e => {
-      console.log(e)
+      Logging.log(e)
     })
 
     // If someone has created or edited a ride horse
   } else if (rideRecord.doc && rideRecord.doc.type === 'rideHorse') {
-    console.log('ride horse training recalc')
+    Logging.log('ride horse training recalc')
     leaderboardRecalc = true
     const key = `"${rideRecord.doc.rideID}"`
       // Find all the users who have a record of that ride on their training
@@ -195,14 +196,14 @@ function recalcTrainingRecords(rideRecord, slouch) {
         }
       }
 
-      console.log('saving training from rideHorse')
+      Logging.log('saving training from rideHorse')
       return slouch.doc.upsert(USERS_DB, training.doc).then(() => {
         TrainingCache.updateOrInvalidate(training)
       })
     }).then(() => {
-      console.log('rideHorse update to training record complete')
+      Logging.log('rideHorse update to training record complete')
     }).catch(e => {
-      console.log(e)
+      Logging.log(e)
     })
   }
 
@@ -223,7 +224,7 @@ function recalcTrainingRecords(rideRecord, slouch) {
       const leaderboardRecord = calcLeaderboards(rideSummaries, optOuts)
       return slouch.doc.upsert(USERS_DB, leaderboardRecord)
     }).then(() => {
-      console.log('leaderboards updated')
+      Logging.log('leaderboards updated')
     })
   }
 }
@@ -280,9 +281,9 @@ function calcTrainingRecords (slouch) {
 
       return Promise.all(allUpdates)
     }).then(() => {
-      console.log('training record initial generation complete')
+      Logging.log('training record initial generation complete')
     }).catch(e => {
-      console.log(e)
+      Logging.log(e)
     })
   })
 }
@@ -399,7 +400,7 @@ function newRideNotification (rideRecord, slouch, gcmClient, ddbService) {
       gcmService.sendMessage(title, body, data, allTokens)
     }).catch(e => {
       Sentry.captureException(e)
-      console.log(e)
+      Logging.log(e)
     })
   }
 }
@@ -466,7 +467,7 @@ function newCommentNotification (commentRecord, slouch, gcmClient, ddbService) {
       }
       gcmService.sendMessage(title, body, data, allTokens)
     }).catch((e) => {
-      console.log(e)
+      Logging.log(e)
     })
   }
 }

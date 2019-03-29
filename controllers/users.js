@@ -17,6 +17,7 @@ import { makeToken, pwResetCode, unixTimeNow } from '../helpers'
 import DynamoDBService from '../services/dynamoDB'
 import EmailerService from '../services/emailer'
 import { USERS_DB, USERS_DESIGN_DOC } from "../design_docs/users"
+import Logging from '../services/Logging'
 
 const slouch = new Slouch(
   `http://${configGet(COUCH_USERNAME)}:${configGet(COUCH_PASSWORD)}@${configGet(COUCH_HOST)}`
@@ -33,7 +34,7 @@ const router = express.Router()
 router.use(bodyParser.json())
 
 router.post('/login', async (req, res, next) => {
-  console.log('user logging in')
+  Logging.log('user logging in')
   const email = req.body.email
   const password = req.body.password
 
@@ -42,7 +43,7 @@ router.post('/login', async (req, res, next) => {
   try {
     found = await ddbService.getItem(USERS_TABLE_NAME, { email: {S: email }})
   } catch (e) {
-    console.log(e)
+    Logging.log(e)
     next(e)
   }
 
@@ -85,7 +86,7 @@ router.post('/login', async (req, res, next) => {
 
 
 router.post('/', async (req, res, next) => {
-  console.log('creating new user')
+  Logging.log('creating new user')
   const email = req.body.email
   const password = req.body.password
 
@@ -108,7 +109,7 @@ router.post('/', async (req, res, next) => {
     createTime: unixTimeNow(),
     finishedFirstStart: false
   }).then(newUserRecord => {
-    console.log('new user created')
+    Logging.log('new user created')
     newUser = newUserRecord
     const newTraining = {
       "_id": `${newUser.id}_training`,
@@ -117,10 +118,10 @@ router.post('/', async (req, res, next) => {
       "lastUpdate": unixTimeNow(),
       "type": "training"
     }
-    console.log(newTraining)
+    Logging.log(newTraining)
     return slouch.doc.create(USERS_DB, newTraining)
   }).then(() => {
-    console.log('training record created')
+    Logging.log('training record created')
     return slouch.doc.create(USERS_DB, {
       "_id": `${newUser.id}_${configGet(NICOLE_USER_ID)}`,
       "followingID": configGet(NICOLE_USER_ID),
@@ -136,7 +137,7 @@ router.post('/', async (req, res, next) => {
         "type": "follow"
       })
     }).then(() => {
-      console.log('nicole follow created')
+      Logging.log('nicole follow created')
       const { token, refreshToken } = makeToken(newUser.id, email)
       return ddbService.putItem(USERS_TABLE_NAME, {
         email: {S: email},
@@ -147,7 +148,7 @@ router.post('/', async (req, res, next) => {
         nextToken: {S:token},
         acceptedTOSVersion: {S: '1'},
       }).then(() => {
-        console.log('ddb record created')
+        Logging.log('ddb record created')
         res.set('x-auth-token', token).json({
           id: newUser.id,
           token, // remove this when everyone is on > 0.45.0
@@ -156,7 +157,7 @@ router.post('/', async (req, res, next) => {
         })
 
         const emailer = new EmailerService()
-        console.log(email)
+        Logging.log(email)
         return emailer.signupHappened(email)
       })
     })

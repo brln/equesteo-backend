@@ -33,6 +33,7 @@
     "puppeteer": "^1.12.2",
     "react-scripts": "^1.1.4",
     "request": "^2.88.0",
-    "sharp": "^0.21.1"
+    "sharp": "^0.21.1",
+    "winston": "^3.2.1"
   }
 }

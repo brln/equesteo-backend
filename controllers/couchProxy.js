@@ -5,6 +5,7 @@ import { authenticator } from '../auth'
 import { configGet, COUCH_HOST, COUCH_USERNAME, COUCH_PASSWORD } from '../config'
 import CouchService from '../services/Couch'
 import DynamoDBService from '../services/dynamoDB'
+import Logging from '../services/Logging'
 
 const USERS_TABLE_NAME = 'equesteo_users'
 
@@ -102,7 +103,6 @@ router.post(`/${DB_REG}/_bulk_get`, authenticator, checkDB, (req, res, next) => 
 })
 
 router.get(`/${DB_REG}/:id`, authenticator, checkDB, (req, res, next) => {
-  console.log(req.params.id)
   req.pipe(couchService.getItem(req.params.db, req.params.id, req.query)).pipe(res)
 })
 
@@ -116,7 +116,7 @@ function disableAccount (email) {
     item.enabled = { BOOL: false }
     return ddbService.putItem(USERS_TABLE_NAME, item)
   }).catch(e => {
-    console.log(e, 'error disabling nefarious account')
+    Logging.log(e, 'error disabling nefarious account')
   })
 }
 

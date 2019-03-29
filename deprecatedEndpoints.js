@@ -10,6 +10,7 @@ import {
   MAPBOX_TOKEN,
   NODE_ENV,
 } from "./config"
+import Logging from './services/Logging'
 
 app.get('/createFCMDB', async (req, res) => {
   const tableName = 'equesteo_fcm_tokens'
@@ -28,7 +29,7 @@ app.get('/changeMaps', async (req, res) => {
   const staticService = mbxStatic({accessToken: configGet(MAPBOX_TOKEN)})
   await slouch.doc.all(RIDES_DB, {include_docs: true}).each(async (item) => {
     if (item.doc.type === 'ride') {
-      console.log(count)
+      Logging.log(count)
       const coordinates = await slouch.doc.get(RIDES_DB, `${item.doc._id}_coordinates`, {include_docs: true})
       const parsed = coordinates.rideCoordinates.reduce((accum, coord) => {
         accum.push([coord[1], coord[0]])
@@ -155,7 +156,7 @@ app.get('/replicateProd', async (req, res) => {
   if (configGet(NODE_ENV) !== 'local') {
     return res.json({'not for': "you"})
   }
-  console.log('destroying local DBs')
+  Logging.log('destroying local DBs')
   try {
     const destroys = [
       slouch.db.destroy(RIDES_DB),
@@ -171,7 +172,7 @@ app.get('/replicateProd', async (req, res) => {
     }
 
 
-    console.log('recreating local dbs')
+    Logging.log('recreating local dbs')
     const creates =[
       slouch.db.create(RIDES_DB),
       slouch.db.create(USERS_DB),
@@ -188,24 +189,24 @@ app.get('/replicateProd', async (req, res) => {
 
     const replications = []
     for (let db of dbs) {
-      console.log(`starting replicating ${db}`)
+      Logging.log(`starting replicating ${db}`)
       replications.push(slouch.db.replicate({
         source: prodCouch + db,
         target: db
       }))
     }
     await Promise.all(replications)
-    console.log('replications complete')
+    Logging.log('replications complete')
 
     const tableName = 'equesteo_users'
     const ddbService = new DynamoDBService()
-    console.log('deleting dynamoDB users table')
+    Logging.log('deleting dynamoDB users table')
     try{
       await ddbService.deleteTable(tableName)
     } catch (e) {
-      console.log('skipping delete')
+      Logging.log('skipping delete')
     }
-    console.log('creating dynamoDB users table')
+    Logging.log('creating dynamoDB users table')
     await ddbService.createTable('email', 'S', tableName)
 
     const prodDDBService = new DynamoDBService('production')
@@ -222,7 +223,7 @@ app.get('/replicateProd', async (req, res) => {
     await Promise.all(putPromises)
   }
   catch (e) {
-    console.log(e)
+    Logging.log(e)
     return res.json({'error': e.toString()})
   }
   return res.json({'done': "now"})
@@ -400,7 +401,7 @@ app.get('/fixElevations', (req, res) => {
   }).then(() => {
     const docUpdates = []
     for (let rideID of Object.keys(rides)) {
-      console.log(rideID)
+      Logging.log(rideID)
       const coords = rideCoordinates[rideID + '_coordinates']
       const elevations = rideElevations[rideID + '_elevations']
       if (elevations) {
@@ -434,24 +435,24 @@ app.get('/resizeAllImages', (req, res) => {
 
   slouch.db.view(USERS_DB, USERS_DESIGN_DOC, 'userPhotos', {include_docs: true}).each(userPhoto => {
     if (userPhoto.doc.uri.startsWith('https://')) {
-      return uploadPhoto(userPhoto, 'equesteo-profile-photos-2').catch(e => { console.log(userPhoto )})
+      return uploadPhoto(userPhoto, 'equesteo-profile-photos-2').catch(e => { Logging.log(userPhoto )})
     }
   }).then(() => {
     return slouch.db.view(HORSES_DB, HORSES_DESIGN_DOC, 'horsePhotos', {include_docs: true}).each(horsePhoto => {
       if (horsePhoto.doc.uri.startsWith('https://')) {
-        return uploadPhoto(horsePhoto, 'equesteo-horse-photos').catch(e => { console.log(horsePhoto)})
+        return uploadPhoto(horsePhoto, 'equesteo-horse-photos').catch(e => { Logging.log(horsePhoto)})
       }
     })
   }).then(() => {
     return slouch.db.view(RIDES_DB, RIDES_DESIGN_DOC, 'ridePhotos', {include_docs: true}).each(ridePhoto => {
       if (ridePhoto.doc.uri.startsWith('https://')) {
-        return uploadPhoto(ridePhoto, 'equesteo-ride-photos-2').catch(e => { console.log(ridePhoto)})
+        return uploadPhoto(ridePhoto, 'equesteo-ride-photos-2').catch(e => { Logging.log(ridePhoto)})
       }
     })
   }).then(() => {
     res.json({'all': 'done'})
   }).catch(e => {
-    console.log(e)
+    Logging.log(e)
     next(e)
   })
 })

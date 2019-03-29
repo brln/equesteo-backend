@@ -32,6 +32,7 @@ import startRideChangeIterator from './ChangeIterators/rides'
 import startUsersChangeIterator from './ChangeIterators/users'
 import DynamoDBService from './services/dynamoDB'
 import S3Service from './services/s3'
+import Logging from './services/Logging'
 
 
 const app = express()
@@ -84,7 +85,7 @@ app.get('/errorTest', (req, res) => {
 })
 
 app.get('/unauthorizedTest', (req, res) => {
-  console.log('unauthorized test')
+  Logging.log('unauthorized test')
   return res.status(401).json({error: 'Invalid Authorization header'})
 })
 
@@ -112,15 +113,15 @@ app.get('/rideMap/:url', (req, res, next) => {
   s3Service.get(BUCKET_NAME, hashKey).then(data => {
     found = true
     return data.Body
-  }).catch(() => { console.log(`${hashKey} not found`)}).then(data => {
+  }).catch(() => { Logging.log(`${hashKey} not found`)}).then(data => {
     if (found) {
       return data
     } else {
       return fetch(decoded + `?access_token=${configGet(MAPBOX_TOKEN)}`).then(resp => {
-        console.log('fetching from mapbox')
+        Logging.log('fetching from mapbox')
         return resp.buffer()
       }).then(data => {
-        console.log('reading mapbox buffer')
+        Logging.log('reading mapbox buffer')
         fromMapbox = data
         return data
       })
@@ -131,9 +132,9 @@ app.get('/rideMap/:url', (req, res, next) => {
   }).then(() => {
     if (!found) {
       return s3Service.put(BUCKET_NAME, hashKey, fromMapbox).then(() => {
-        console.log(`cached ${hashKey}`)
+        Logging.log(`cached ${hashKey}`)
       }).catch(e => {
-        console.log(e)
+        Logging.log(e)
       })
     }
   })
@@ -143,7 +144,7 @@ app.get('/replicateProd', async (req, res) => {
   if (configGet(NODE_ENV) !== 'local') {
     return res.json({'not for': "you"})
   }
-  console.log('destroying local DBs')
+  Logging.log('destroying local DBs')
   try {
     const destroys = [
       slouch.db.destroy(RIDES_DB),
@@ -158,7 +159,7 @@ app.get('/replicateProd', async (req, res) => {
       }
     }
 
-    console.log('recreating local dbs')
+    Logging.log('recreating local dbs')
     const creates =[
       slouch.db.create(RIDES_DB),
       slouch.db.create(USERS_DB),
@@ -167,7 +168,7 @@ app.get('/replicateProd', async (req, res) => {
     try {
       await Promise.all(creates)
     } catch (e) {
-      console.log('wtf')
+      Logging.log('wtf')
       throw e
     }
 
@@ -176,24 +177,24 @@ app.get('/replicateProd', async (req, res) => {
 
     const replications = []
     for (let db of dbs) {
-      console.log(`starting replication on ${db}`)
+      Logging.log(`starting replication on ${db}`)
       replications.push(slouch.db.replicate({
         source: prodCouch + db,
         target: db
       }))
     }
     await Promise.all(replications)
-    console.log('replications complete')
+    Logging.log('replications complete')
 
     const tableName = 'equesteo_users'
     const ddbService = new DynamoDBService()
-    console.log('deleting dynamoDB users table')
+    Logging.log('deleting dynamoDB users table')
     try{
       await ddbService.deleteTable(tableName)
     } catch (e) {
-      console.log('skipping delete')
+      Logging.log('skipping delete')
     }
-    console.log('creating dynamoDB users table')
+    Logging.log('creating dynamoDB users table')
     await ddbService.createTable('email', 'S', tableName)
 
     const prodDDBService = new DynamoDBService('production')
@@ -212,7 +213,7 @@ app.get('/replicateProd', async (req, res) => {
     await Promise.all(putPromises)
   }
   catch (e) {
-    console.log(e)
+    Logging.log(e)
     return res.json({'error': e.toString()})
   }
   return res.json({'done': "now"})
@@ -223,7 +224,7 @@ if (configGet(NODE_ENV) !== 'local') {
 }
 
 const errorHandler = (err, req, res, next) => {
-  console.log(err);
+  Logging.log(err);
   res.status(500).json({'error': '500 Internal Server Error'})
 };
 
@@ -234,6 +235,6 @@ app.use(function (req, res, next) {
 })
 
 app.listen(process.env.PORT || 8080, '0.0.0.0', function () {
-  console.log('Example app listening on port 8080!');
+  Logging.log('Example app listening on port 8080!');
 });
 

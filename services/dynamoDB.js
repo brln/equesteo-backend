@@ -4,6 +4,7 @@ import {
   DYNAMODB_ENDPOINT,
   NODE_ENV
 } from "../config"
+import Logging from './Logging'
 
 export default class DynamoDBService {
   constructor (env=configGet(NODE_ENV)) {
@@ -23,7 +24,7 @@ export default class DynamoDBService {
         if (err) {
           reject(err)
         } else {
-          console.log('deleted table!')
+          Logging.log('deleted table!')
           resolve(data)
         }
       })
@@ -85,15 +86,15 @@ export default class DynamoDBService {
     return new Promise((resolve, reject) => {
       this.ddbDocument.scan({TableName: tableName}, (err, data) => {
         if (err) {
-          console.log(err)
+          Logging.log(err)
           reject()
         } else {
-          console.log("Scan succeeded.");
+          Logging.log("Scan succeeded.");
           resolve(data.Items)
           // @TODO: implement this when the db is big enough to need it
           // continue scanning if we have more items
           // if (typeof data.LastEvaluatedKey != "undefined") {
-          //   console.log("Scanning for more...");
+          //   Logging.log("Scanning for more...");
           //   params.ExclusiveStartKey = data.LastEvaluatedKey;
           //   docClient.scan(params, onScan);
           // }

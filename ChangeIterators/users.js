@@ -1,4 +1,5 @@
 import { USERS_DB, USERS_DESIGN_DOC } from "../design_docs/users"
+import Logging from '../services/Logging'
 
 export default function startUsersChangeIterator (ESClient, slouch) {
   slouch.db.view(USERS_DB, USERS_DESIGN_DOC, 'byID', {include_docs: true}).each(item => {
@@ -24,7 +25,7 @@ export default function startUsersChangeIterator (ESClient, slouch) {
       })
     }
   }).then(() => {
-    console.log('initial User elastic record update complete')
+    Logging.log('initial User elastic record update complete')
     let iterator = slouch.db.changes('users', {
       include_docs: true,
       feed: 'continuous',
@@ -38,7 +39,7 @@ export default function startUsersChangeIterator (ESClient, slouch) {
         return slouch.doc.get(USERS_DB, item.doc.profilePhotoID).then((profilePhoto) => {
           profilePhotoURL = profilePhoto.uri
         }).catch(() => {}).then(() => {
-          console.log('updating elasticsearch record: ' + item.doc._id)
+          Logging.log('updating elasticsearch record: ' + item.doc._id)
           return ESClient.update({
             index: 'users',
             type: 'users',
@@ -55,7 +56,7 @@ export default function startUsersChangeIterator (ESClient, slouch) {
           })
         })
       } else if (item.doc && item.doc.type === 'user') {
-        console.log('deleting elasticsearch record: ' + item.doc._id)
+        Logging.log('deleting elasticsearch record: ' + item.doc._id)
         return ESClient.delete({
           index: 'users',
           type: 'users',
@@ -65,6 +66,6 @@ export default function startUsersChangeIterator (ESClient, slouch) {
       }
     })
   }).catch(e => {
-    console.log(e)
+    Logging.log(e)
   })
 }

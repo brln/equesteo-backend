@@ -1,6 +1,8 @@
 import aws from 'aws-sdk'
 import sharp from 'sharp'
 
+import Logging from './Logging'
+
 const s3 = new aws.S3()
 
 export default class PhotoUploader {
@@ -31,7 +33,7 @@ export default class PhotoUploader {
               if (s3Err) {
                 rej(s3Err)
               } else {
-                console.log(`File uploaded successfully at ${data.Location}`)
+                Logging.log(`File uploaded successfully at ${data.Location}`)
                 res()
               }
             })
