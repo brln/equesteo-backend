@@ -18,6 +18,10 @@ export default class CouchService {
     return request(this.root)
   }
 
+  getDBInfo (db) {
+    return this.request(GET, `/${db}/`)
+  }
+
   getLocalDoc (db, id, qs) {
     return this.request(GET, `/${db}/_local/${id}`, qs)
   }

@@ -57,6 +57,10 @@ router.get('/', authenticator, (req, res, next) => {
   req.pipe(couchService.getInfo()).pipe(res)
 })
 
+router.get(`/${DB_REG}/`, authenticator, checkDB, (req, res, next) => {
+  req.pipe(couchService.getDBInfo(req.params.db)).pipe(res)
+})
+
 router.get(`/${DB_REG}/_local/:id`, authenticator, checkDB, (req, res, next) => {
   req.pipe(couchService.getLocalDoc(req.params.db, req.params.id, req.query)).pipe(res)
 })
