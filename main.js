@@ -172,8 +172,8 @@ app.get('/replicateProd', async (req, res) => {
       throw e
     }
 
-    const prodCouch = `http://equesteo:${process.env.PROD_COUCH_PASSWORD}@52.9.138.254:5984/`
-    const dbs = ['horses', 'rides', 'users']
+    const prodCouch = `http://equesteo:${process.env.PROD_COUCH_PASSWORD}@13.56.191.108:5984/`
+    const dbs = ['horses', 'rides', 'users', 'notifications']
 
     const replications = []
     for (let db of dbs) {
