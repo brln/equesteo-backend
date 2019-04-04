@@ -76,6 +76,18 @@ export function createUsersDesignDoc (slouch) {
             }
           }.toString()
         },
+        userDocIDs: {
+          map: function(doc) {
+            if (doc.type === 'training' || doc.type === 'userPhoto') {
+              emit(doc.userID, null)
+            } else if (doc.type === 'user') {
+              emit(doc._id, null)
+            } else if (doc.type === 'follow') {
+              emit(doc.followingID, null)
+              emit(doc.followerID, null)
+            }
+          }.toString()
+        },
         trainingsByRideID: {
           map: function (doc) {
             if (doc.type === 'training') {

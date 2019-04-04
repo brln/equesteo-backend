@@ -48,7 +48,35 @@ export function createRidesDesignDoc (slouch) {
             if (doc.type === 'ridePhoto') {
               emit(doc._id, null)
             }
-          } .toString()
+          }.toString()
+        },
+        followingRideDocIDs: {
+          map: function (doc) {
+            if (doc.deleted !== true && doc.type !== 'rideAtlasEntry') {
+              emit(doc.userID)
+            }
+          }.toString()
+        },
+        followerRideDocIDs: {
+          map: function (doc) {
+            if (doc.deleted !== true) {
+              if (
+                doc.type === 'comment'
+                || doc.type === 'carrot'
+                || doc.type === 'ridePhoto'
+                || doc.type === 'rideHorse'
+              ) {
+                emit(doc.userID)
+              }
+            }
+          }.toString()
+        },
+        atlasEntryDocIDs: {
+          map: function (doc) {
+            if (doc.deleted !== true && doc.type === 'rideAtlasEntry') {
+              emit(doc.userID)
+            }
+          }.toString()
         }
       },
       filters: {

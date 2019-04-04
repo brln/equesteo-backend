@@ -86,7 +86,7 @@ router.post(`/${DB_REG}/_design/:designDoc/_view/:view`, checkDB, authenticator,
   req.pipe(couchService.postView(req.params.db, req.params.designDoc, req.params.view, req.query)).pipe(res)
 })
 
-router.post(`/${DB_REG}/_changes`, authenticator, checkDB, checkFilter, (req, res, next) => {
+router.post(`/${DB_REG}/_changes`, authenticator, checkDB, (req, res, next) => {
   req.pipe(couchService.postChanges(req.params.db, req.query)).pipe(res)
 })
 
