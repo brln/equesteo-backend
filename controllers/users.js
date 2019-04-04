@@ -129,6 +129,14 @@ router.post('/', async (req, res, next) => {
       "deleted": false,
       "type": "follow"
     }).then(() => {
+      return slouch.doc.create(USERS_DB, {
+        "_id": `${configGet(NICOLE_USER_ID)}_${newUser.id}`,
+        "followingID": newUser.id,
+        "followerID": configGet(NICOLE_USER_ID),
+        "deleted": false,
+        "type": "follow"
+      })
+    }).then(() => {
       const { token, refreshToken } = makeToken(newUser.id, email)
       return ddbService.putItem(USERS_TABLE_NAME, {
         email: {S: email},
