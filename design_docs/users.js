@@ -63,7 +63,7 @@ export function createUsersDesignDoc (slouch) {
         },
         relevantFollows: {
           map: function (doc) {
-            if (doc.type === 'follow') {
+            if (doc.type === 'follow' && doc.deleted !== true) {
               emit(doc.followingID, [doc.followerID, 'following'])
               emit(doc.followerID, [doc.followingID, 'follower'])
             }
@@ -78,13 +78,15 @@ export function createUsersDesignDoc (slouch) {
         },
         userDocIDs: {
           map: function(doc) {
-            if (doc.type === 'training' || doc.type === 'userPhoto') {
-              emit(doc.userID, null)
-            } else if (doc.type === 'user') {
-              emit(doc._id, null)
-            } else if (doc.type === 'follow') {
-              emit(doc.followingID, null)
-              emit(doc.followerID, null)
+            if (doc.deleted !== true) {
+              if (doc.type === 'training' || doc.type === 'userPhoto') {
+                emit(doc.userID, null)
+              } else if (doc.type === 'user') {
+                emit(doc._id, null)
+              } else if (doc.type === 'follow') {
+                emit(doc.followingID, null)
+                emit(doc.followerID, null)
+              }
             }
           }.toString()
         },
