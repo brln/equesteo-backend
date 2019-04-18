@@ -39,49 +39,58 @@ router.post('/login', async (req, res, next) => {
   const password = req.body.password
 
   const ddbService = new DynamoDBService()
-  let found
-  try {
-    found = await ddbService.getItem(USERS_TABLE_NAME, { email: {S: email }})
-  } catch (e) {
-    Logging.log(e)
-    next(e)
-  }
+  let foundID
+  let token
+  let refreshToken
+  const saveToken = ddbService.getItem(USERS_TABLE_NAME, { email: {S: email }}).then(found => {
+    if (!password || !found || !bcrypt.compareSync(password, found.password.S)) {
+      res.status(401).json({'error': 'Wrong username/password'})
+    } else if (!found.enabled || found.enabled.BOOL !== true) {
+      res.status(401).json({'error': 'Account is disabled.'})
+    } else {
+      foundID = found.id.S
+      const madeTokens = makeToken(foundID, email)
+      token = madeTokens.token
+      refreshToken = madeTokens.refreshToken
 
-  if (!password || !found || !bcrypt.compareSync(password, found.password.S)) {
-    return res.status(401).json({'error': 'Wrong username/password'})
-  } else if (!found.enabled || found.enabled.BOOL !== true) {
-    return res.status(401).json({'error': 'Account is disabled.'})
-  } else {
-    const foundID = found.id.S
-    const { token, refreshToken } = makeToken(foundID, email)
-
-    found.refreshToken = {S: refreshToken}
-    found.nextToken = {S: token}
-    try {
-      await ddbService.putItem(USERS_TABLE_NAME, found)
-    } catch (e) {
-      next(e)
+      found.refreshToken = {S: refreshToken}
+      found.nextToken = {S: token}
+      return ddbService.putItem(USERS_TABLE_NAME, found)
     }
+  })
 
-    const following = await slouch.db.viewArray(
-      USERS_DB,
-      USERS_DESIGN_DOC,
-      'following',
-      { key: `"${foundID}"`}
-    )
-    const followers = await slouch.db.viewArray(
-      USERS_DB,
-      USERS_DESIGN_DOC,
-      'followers',
-      { key: `"${foundID}"`}
-    )
-    res.set('x-auth-token', token).json({
-      id: foundID,
-      token, // remove this when everyone is on > 0.45.0
-      followers: followers.rows.map(f => f.value),
-      following: following.rows.map(f => f.value),
+  let following
+  let followers
+  if (saveToken) {
+    saveToken.then(() => {
+      return slouch.db.viewArray(
+        USERS_DB,
+        USERS_DESIGN_DOC,
+        'following',
+        { key: `"${foundID}"`}
+      )
+    }).then(_following => {
+      following = _following
+      return slouch.db.viewArray(
+        USERS_DB,
+        USERS_DESIGN_DOC,
+        'followers',
+        { key: `"${foundID}"`}
+      )
+    }).then(_followers => {
+      followers = _followers
+      res.set('x-auth-token', token).json({
+        id: foundID,
+        followers: followers.rows.map(f => f.value),
+        following: following.rows.map(f => f.value),
+      })
     })
   }
+
+  saveToken.catch(e => {
+    Logging.log(e)
+    next(e)
+  })
 })
 
 
