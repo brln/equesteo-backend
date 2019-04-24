@@ -27,6 +27,15 @@ export function createHorsesDesignDoc (slouch) {
             }
           }.toString()
         },
+        allJoins2: {
+          map: function (doc) {
+            if (doc.type === 'horseUser' || doc.type === 'horsePhoto' || doc.type === 'horseCareEvent') {
+              emit(doc.userID, doc.horseID)
+            } else if (doc.type === 'careEvent') {
+              emit(doc.userID, doc._id)
+            }
+          }.toString()
+        },
         horsePhotos: {
           map: function (doc) {
             if (doc.type === 'horsePhoto') {

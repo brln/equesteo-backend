@@ -99,6 +99,27 @@ export function createUsersDesignDoc (slouch) {
             }
           }.toString()
         },
+        userCount: {
+          map: function (doc) {
+            if (doc.type === 'user') {
+              emit(doc._id, null)
+            }
+          }.toString(),
+          reduce: '_count'
+        },
+        usersByDay: {
+          map: function (doc) {
+            if (doc.type === 'user') {
+              var now = new Date(doc.createTime);
+              now.setTime(now.getTime() - 7 * 60 * 60 * 1000) // timezone adjustment, yay CA
+              var startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+              startOfDay.setTime(startOfDay.getTime() + 7 * 60 * 60 * 1000) // TZ adjust
+              var timestamp = (startOfDay) / 1000
+              emit(timestamp, 1)
+            }
+          }.toString(),
+          reduce: '_count'
+        },
         userPhotos: {
           map: function (doc) {
             if (doc.type === 'userPhoto') {

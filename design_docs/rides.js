@@ -77,7 +77,20 @@ export function createRidesDesignDoc (slouch) {
               emit(doc.userID)
             }
           }.toString()
-        }
+        },
+        ridesByDay: {
+          map: function (doc) {
+            if (doc.type === 'ride' && doc.deleted !== true) {
+              var now = new Date(doc.startTime);
+              now.setTime(now.getTime() - 7 * 60 * 60 * 1000) // timezone adjustment, yay CA
+              var startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+              startOfDay.setTime(startOfDay.getTime() + 7 * 60 * 60 * 1000) // TZ adjust
+              var timestamp = (startOfDay) / 1000
+              emit(timestamp, 1)
+            }
+          }.toString(),
+          reduce: '_count'
+        },
       },
       filters: {
         byUserIDs: function (doc, req) {
