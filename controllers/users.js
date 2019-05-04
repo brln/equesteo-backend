@@ -13,7 +13,7 @@ import {
   ELASTICSEARCH_HOST,
   NICOLE_USER_ID,
 } from "../config"
-import { makeToken, pwResetCode, unixTimeNow } from '../helpers'
+import { htID, makeToken, pwResetCode, unixTimeNow } from '../helpers'
 import DynamoDBService from '../services/dynamoDB'
 import EmailerService from '../services/emailer'
 import { USERS_DB, USERS_DESIGN_DOC } from "../design_docs/users"
@@ -29,6 +29,7 @@ const ESClient = new elasticsearch.Client({
 
 const USERS_TABLE_NAME = 'equesteo_users'
 const FCM_TABLE_NAME = 'equesteo_fcm_tokens'
+const HOOF_TRACKS_IDS_TABLE_NAME = 'equesteo_hoof_tracks_ids'
 
 const router = express.Router()
 router.use(bodyParser.json())
@@ -303,6 +304,45 @@ router.post('/feedback', authenticator, (req, res, next) => {
   const emailService = new EmailerService()
   emailService.sendFeedback(id, feedback).then(() => {
     res.json({})
+  })
+})
+
+router.get('/hoofTracksID', authenticator, (req, res, next) => {
+  const ddbService = new DynamoDBService()
+  let foundID
+  ddbService.getItem(HOOF_TRACKS_IDS_TABLE_NAME, { userID: {S: res.locals.userID }}).then(found => {
+    if (found) {
+      foundID = found.htID.S
+      return Promise.resolve()
+    } else {
+      foundID = htID()
+      const putItem = {
+        userID: {S: res.locals.userID},
+        htID: {S: foundID}
+      }
+      return ddbService.putItem(HOOF_TRACKS_IDS_TABLE_NAME, putItem)
+    }
+  }).then(() => {
+    res.json({htID: foundID})
+  }).catch(e => {
+    next(e)
+  })
+})
+
+router.get('/resetHoofTracksID', authenticator, (req, res, next) => {
+  const ddbService = new DynamoDBService()
+  let newID
+  ddbService.getItem(HOOF_TRACKS_IDS_TABLE_NAME, { userID: {S: res.locals.userID }}).then(found => {
+    newID = htID()
+    const putItem = {
+      userID: {S: res.locals.userID},
+      htID: {S: newID}
+    }
+    return ddbService.putItem(HOOF_TRACKS_IDS_TABLE_NAME, putItem)
+  }).then(() => {
+    res.json({htID: newID})
+  }).catch(e => {
+    next(e)
   })
 })
 

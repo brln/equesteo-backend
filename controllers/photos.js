@@ -14,7 +14,7 @@ function multipartMiddleware () {
   return multer().fields([{name: 'file', maxCount: 1}])
 }
 
-router.post('/photos/user', authenticator, multipartMiddleware(), (req, res) => {
+router.post('/user', authenticator, multipartMiddleware(), (req, res) => {
   Logging.log('user photo upload started')
   const file = req.files.file[0]
   PhotoUploader.uploadPhoto(file.buffer, file.originalname, 'equesteo-profile-photos-2').then(() => {
@@ -23,7 +23,7 @@ router.post('/photos/user', authenticator, multipartMiddleware(), (req, res) => 
 })
 
 
-router.post('/photos/horse', authenticator, multipartMiddleware(), (req, res) => {
+router.post('/horse', authenticator, multipartMiddleware(), (req, res) => {
   Logging.log('horse photo upload started')
   const file = req.files.file[0]
   PhotoUploader.uploadPhoto(file.buffer, file.originalname, 'equesteo-horse-photos').then(() => {
@@ -32,7 +32,7 @@ router.post('/photos/horse', authenticator, multipartMiddleware(), (req, res) =>
 })
 
 
-router.post('/photos/ride', authenticator, multipartMiddleware(), (req, res) => {
+router.post('/ride', authenticator, multipartMiddleware(), (req, res) => {
   Logging.log('ride photo upload started')
   const file = req.files.file[0]
   PhotoUploader.uploadPhoto(file.buffer, file.originalname, 'equesteo-ride-photos-2').then(() => {

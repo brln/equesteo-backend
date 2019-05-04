@@ -293,3 +293,9 @@ export function speedGradient (speed) {
 export function randU32Sync() {
   return (crypto.randomBytes(4).readUInt32BE(0, true) - 2147483651).toString()
 }
+
+export function htID () {
+  return [0, 0, 0].map(_ => {
+    return (Math.random().toString(36)+'00000000000000000').slice(2, 5).toUpperCase()
+  }).join('-')
+}

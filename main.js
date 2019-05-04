@@ -22,7 +22,13 @@ import {
   MAPBOX_TOKEN,
   NODE_ENV,
 } from "./config"
-import { couchProxyRouter, photosRouter, sharableRouter, usersRouter } from './controllers'
+import {
+  couchProxyRouter,
+  hoofTracksRouter,
+  photosRouter,
+  sharableRouter,
+  usersRouter
+} from './controllers'
 import { createUsersDesignDoc, USERS_DB } from "./design_docs/users"
 import { createHorsesDesignDoc, HORSES_DB } from "./design_docs/horses"
 import { createRidesDesignDoc, RIDES_DB } from './design_docs/rides'
@@ -62,7 +68,8 @@ createNotificationsDesignDoc(slouch)
 // Create endpoints
 app.use('/couchProxy', couchProxyRouter)
 app.use('/users', usersRouter)
-app.use('', photosRouter)
+app.use('/hoofTracks', hoofTracksRouter)
+app.use('/photos', photosRouter)
 app.use('', sharableRouter)
 
 const ESClient = new elasticsearch.Client({

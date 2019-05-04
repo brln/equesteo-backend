@@ -120,4 +120,21 @@ export default class DynamoDBService {
       });
     })
   }
+
+  async deleteItem(tableName, key) {
+    return new Promise((resolve, reject) => {
+      const params = {
+        TableName: tableName,
+        Key: key
+      }
+
+      this.ddb.deleteItem(params, function (err, data) {
+        if (err) {
+          reject(err)
+        } else {
+          resolve(data.Item)
+        }
+      });
+    })
+  }
 }

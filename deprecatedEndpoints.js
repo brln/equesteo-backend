@@ -456,3 +456,27 @@ app.get('/resizeAllImages', (req, res) => {
     next(e)
   })
 })
+
+router.get('/createHTID', async (req, res) => {
+  const tableName = HOOF_TRACKS_IDS_TABLE_NAME
+  try {
+    const ddbService = new DynamoDBService()
+    await ddbService.deleteTable(tableName)
+  } catch (e) {}
+
+  const ddbService = new DynamoDBService()
+  await ddbService.createTable('userID', 'S', tableName)
+  return res.json({"all": "done"})
+})
+
+router.get('/createCoords', async (req, res) => {
+  const tableName = HOOF_TRACKS_COORDS_TABLE_NAME
+  try {
+    const ddbService = new DynamoDBService()
+    await ddbService.deleteTable(tableName)
+  } catch (e) {}
+
+  const ddbService = new DynamoDBService()
+  await ddbService.createTable('htID', 'S', tableName)
+  return res.json({"all": "done"})
+})
