@@ -30,6 +30,7 @@ const ESClient = new elasticsearch.Client({
 const USERS_TABLE_NAME = 'equesteo_users'
 const FCM_TABLE_NAME = 'equesteo_fcm_tokens'
 const HOOF_TRACKS_IDS_TABLE_NAME = 'equesteo_hoof_tracks_ids'
+const HOOF_TRACKS_COORDS_TABLE_NAME = 'equesteo_hoof_tracks_coords'
 
 const router = express.Router()
 router.use(bodyParser.json())
@@ -333,6 +334,9 @@ router.get('/resetHoofTracksID', authenticator, (req, res, next) => {
   const ddbService = new DynamoDBService()
   let newID
   ddbService.getItem(HOOF_TRACKS_IDS_TABLE_NAME, { userID: {S: res.locals.userID }}).then(found => {
+    if (found && found.htID) {
+      ddbService.deleteItem(HOOF_TRACKS_COORDS_TABLE_NAME, { htID: {S: found.htID.S }}).catch(e => {console.log(e)})
+    }
     newID = htID()
     const putItem = {
       userID: {S: res.locals.userID},
