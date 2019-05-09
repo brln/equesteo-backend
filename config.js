@@ -13,11 +13,12 @@ export const NODE_ENV = 'NODE_ENV'
 export const OWN_URL = 'OWN_URL'
 export const SENDGRID_API_TOKEN = 'SENDGRID_API_TOKEN'
 export const TOP_SECRET_JWT_TOKEN = 'TOP_SECRET_JWT_TOKEN'
+export const USER_COUCHDB_PASSWORD = 'USER_COUCHDB_PASSWORD'
 
 const defaults = {
   AWS_SECRET_ACCESS_KEY: 'asdf',
   AWS_ACCESS_KEY_ID: 'qwer',
-  COUCH_HOST: 'localhost:5984',
+  COUCH_HOST: 'ec2-54-183-185-247.us-west-1.compute.amazonaws.com:5984',
   COUCH_PASSWORD: 'equesteo',
   COUCH_USERNAME: 'equesteo',
   DYNAMODB_ENDPOINT: 'http://localhost:8000',
@@ -32,6 +33,7 @@ const defaults = {
   PUSHER_SECRET: 'fiend',
   SENDGRID_API_TOKEN: 'something,',
   TOP_SECRET_JWT_TOKEN: 'some super top secret token',
+  USER_COUCHDB_PASSWORD: 'Z7EYqr4CWaQXcF7oQ4E3GHaimr4b2KktcxoqoxenCZdcR6k8Kr'
 }
 
 export function configGet (envVar) {

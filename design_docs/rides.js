@@ -5,7 +5,56 @@ export function createRidesDesignDoc (slouch) {
   slouch.db.create(RIDES_DB).then(() => {
     slouch.doc.createOrUpdate(RIDES_DB, {
       _id: RIDES_DESIGN_DOC,
+      validate_doc_update: function (newDoc, oldDoc, userCtx, secObj) {
+        const sourceUserID = userCtx.name
+        if (sourceUserID === 'equesteo') {
+          return
+        }
+
+        if (oldDoc && oldDoc.type !== newDoc.type) {
+          log('bad ride update 1')
+          throw({forbidden: `Bad ride doc update 1: ${oldDoc._id}, ${sourceUserID}`});
+        }
+        const allTypes = [
+          'carrot',
+          'comment',
+          'ride',
+          'rideAtlasEntry',
+          'rideCoordinates',
+          'rideHorse',
+          'rideElevations',
+          'ridePhoto',
+        ]
+        if (!newDoc.type || allTypes.indexOf(newDoc.type) < 0) {
+          log('bad ride update 2')
+          throw({forbidden: `Bad ride doc update 2: ${oldDoc._id}, ${sourceUserID}`});
+        }
+
+        const userCheckTypes = [
+          'carrot',
+          'comment',
+          'rideHorse',
+          'rideCoordinates',
+          'rideElevations',
+          'ridePhoto',
+        ];
+        if (userCheckTypes.indexOf(newDoc.type) > -1 && newDoc.userID !== sourceUserID) {
+          log('bad ride update 3')
+          throw({forbidden: `Bad ride doc update 3: ${oldDoc._id}, ${sourceUserID}, ${newDoc.type}`});
+        }
+
+        if (newDoc.type === 'ride' && newDoc.userID !== sourceUserID && !newDoc.duplicateFrom) {
+          log('bad ride update 4')
+          throw({forbidden: `Bad ride doc update 4: ${oldDoc._id}, ${sourceUserID}, ${newDoc.type}`});
+        }
+      }.toString(),
       views: {
+        types: {
+          map: function (doc) {
+            emit(doc.type, null)
+          }.toString(),
+          reduce: '_count'
+        },
         ridesByID: {
           map: function (doc) {
             if (doc.type === 'ride') {

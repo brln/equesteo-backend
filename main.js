@@ -39,6 +39,7 @@ import startUsersChangeIterator from './ChangeIterators/users'
 import DynamoDBService from './services/dynamoDB'
 import S3Service from './services/s3'
 import Logging from './services/Logging'
+import CouchService from "./services/Couch"
 
 
 const app = express()
@@ -145,6 +146,39 @@ app.get('/rideMap/:url', (req, res, next) => {
       })
     }
   })
+})
+
+
+const couchService = new CouchService(
+  configGet(COUCH_USERNAME),
+  configGet(COUCH_PASSWORD),
+  configGet(COUCH_HOST)
+)
+
+app.get('/createCouchUsers', (req, res) => {
+  const usersTable = 'equesteo_users'
+  ddbService.getAllItems(usersTable).then(users => {
+    const allPromises = []
+    for (let user of users) {
+      const id = user.id
+      allPromises.push(couchService.getUser(id).then(found => {
+        if (!found.error) {
+          console.log('already exists')
+        } else if (found.error === 'not_found') {
+          console.log('making: ' + id)
+          allPromises.push(couchService.createUser(id))
+        } else {
+          throw Error('wut?')
+        }
+      }))
+    }
+    return Promise.all(allPromises)
+  }).then(resp => {
+    return res.json({all: 'done'})
+  }).catch(e => {
+    next(e)
+  })
+
 })
 
 app.get('/replicateProd', async (req, res) => {

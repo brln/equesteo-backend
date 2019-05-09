@@ -1,5 +1,6 @@
 import request from 'request'
 import querystring from 'querystring'
+import { configGet, USER_COUCHDB_PASSWORD } from "../config"
 
 const GET = 'get'
 const POST = 'post'
@@ -85,8 +86,21 @@ export default class CouchService {
     }
   }
 
+  createUser (id) {
+    const url = `/_users/org.couchdb.user:${id}`
+    return this.request(PUT, url, {}, false, {"name": id, "password": configGet(USER_COUCHDB_PASSWORD), "roles": ["equesteoUser"], "type": "user"})
+  }
+
+  getUser (id) {
+    const url = `/_users/org.couchdb.user:${id}`
+    return this.request(GET, url, {}, false).catch()
+  }
+
   request (method, endpoint, qs={}, asStream=true, body=null) {
-    const uri = `${this.root}${endpoint}?${querystring.stringify(qs)}`
+    let uri = `${this.root}${endpoint}`
+    if (Object.keys(qs).length > 0) {
+      uri = uri +  `?${querystring.stringify(qs)}`
+    }
     if (asStream) {
       return request({
         method,
@@ -100,7 +114,7 @@ export default class CouchService {
           uri,
           forever: true,
         }
-        if (method === POST && body) {
+        if ((method === POST || method === PUT) && body) {
           opts.json = body
         }
         request(opts, (err, response, respBody) => {

@@ -14,11 +14,17 @@ import {
   NICOLE_USER_ID,
 } from "../config"
 import { htID, makeToken, pwResetCode, unixTimeNow } from '../helpers'
+import CouchService from '../services/Couch'
 import DynamoDBService from '../services/dynamoDB'
 import EmailerService from '../services/emailer'
 import { USERS_DB, USERS_DESIGN_DOC } from "../design_docs/users"
 import Logging from '../services/Logging'
 
+const couchService = new CouchService(
+  configGet(COUCH_USERNAME),
+  configGet(COUCH_PASSWORD),
+  configGet(COUCH_HOST)
+)
 const slouch = new Slouch(
   `http://${configGet(COUCH_USERNAME)}:${configGet(COUCH_PASSWORD)}@${configGet(COUCH_HOST)}`
 )
@@ -44,7 +50,7 @@ router.post('/login', async (req, res, next) => {
   let foundID
   let token
   let refreshToken
-  const saveToken = ddbService.getItem(USERS_TABLE_NAME, { email: {S: email }}).then(found => {
+  ddbService.getItem(USERS_TABLE_NAME, { email: {S: email }}).then(found => {
     if (!password || !found || !bcrypt.compareSync(password, found.password.S)) {
       res.status(401).json({'error': 'Wrong username/password'})
     } else if (!found.enabled || found.enabled.BOOL !== true) {
@@ -54,114 +60,111 @@ router.post('/login', async (req, res, next) => {
       const madeTokens = makeToken(foundID, email)
       token = madeTokens.token
       refreshToken = madeTokens.refreshToken
-
       found.refreshToken = {S: refreshToken}
       found.nextToken = {S: token}
-      return ddbService.putItem(USERS_TABLE_NAME, found)
-    }
-  })
-
-  let following
-  let followers
-  if (saveToken) {
-    saveToken.then(() => {
-      return slouch.db.viewArray(
-        USERS_DB,
-        USERS_DESIGN_DOC,
-        'following',
-        { key: `"${foundID}"`}
-      )
-    }).then(_following => {
-      following = _following
-      return slouch.db.viewArray(
-        USERS_DB,
-        USERS_DESIGN_DOC,
-        'followers',
-        { key: `"${foundID}"`}
-      )
-    }).then(_followers => {
-      followers = _followers
-      res.set('x-auth-token', token).json({
-        id: foundID,
-        followers: followers.rows.map(f => f.value),
-        following: following.rows.map(f => f.value),
+      let following
+      let followers
+      return ddbService.putItem(USERS_TABLE_NAME, found).then(() => {
+        return slouch.db.viewArray(
+          USERS_DB,
+          USERS_DESIGN_DOC,
+          'following',
+          { key: `"${foundID}"`}
+        )
+      }).then(_following => {
+        following = _following
+        return slouch.db.viewArray(
+          USERS_DB,
+          USERS_DESIGN_DOC,
+          'followers',
+          { key: `"${foundID}"`}
+        )
+      }).then(_followers => {
+        followers = _followers
+        res.set('x-auth-token', token).json({
+          id: foundID,
+          followers: followers.rows.map(f => f.value),
+          following: following.rows.map(f => f.value),
+        })
       })
-    })
-  }
-
-  saveToken.catch(e => {
-    Logging.log(e)
+    }
+  }).catch(e => {
     next(e)
   })
 })
 
 
-router.post('/', async (req, res, next) => {
+router.post('/', (req, res, next) => {
   Logging.log('creating new user')
   const email = req.body.email
   const password = req.body.password
 
   const ddbService = new DynamoDBService()
-  const found = await ddbService.getItem(USERS_TABLE_NAME, { email: {S: email }})
-  if (found) {
-    return res.status(400).json({'error': 'User already exists'})
-  }
-  const hashed = bcrypt.hashSync(password, bcrypt.genSaltSync(10));
-
-  let newUser
-  slouch.doc.create(USERS_DB, {
-    firstName: null,
-    lastName: null,
-    aboutMe: null,
-    profilePhotoID: null,
-    photosByID: {},
-    ridesDefaultPublic: true,
-    type: 'user',
-    createTime: unixTimeNow(),
-    finishedFirstStart: false
-  }).then(newUserRecord => {
-    Logging.log('new user created')
-    newUser = newUserRecord
-    const newTraining = {
-      "_id": `${newUser.id}_training`,
-      "rides": [],
-      "userID": newUser.id,
-      "lastUpdate": unixTimeNow(),
-      "type": "training"
-    }
-    Logging.log(newTraining)
-    return slouch.doc.create(USERS_DB, newTraining)
-  }).then(() => {
-    Logging.log('training record created')
-    return slouch.doc.create(USERS_DB, {
-      "_id": `${newUser.id}_${configGet(NICOLE_USER_ID)}`,
-      "followingID": configGet(NICOLE_USER_ID),
-      "followerID": newUser.id,
-      "deleted": false,
-      "type": "follow"
-    }).then(() => {
+  ddbService.getItem(USERS_TABLE_NAME, { email: { S: email }}).then(found => {
+    if (found) {
+      res.status(400).json({'error': 'User already exists'})
+    } else {
+      let newUser
+      const hashed = bcrypt.hashSync(password, bcrypt.genSaltSync(10));
+      let globalToken
       return slouch.doc.create(USERS_DB, {
-        "_id": `${configGet(NICOLE_USER_ID)}_${newUser.id}`,
-        "followingID": newUser.id,
-        "followerID": configGet(NICOLE_USER_ID),
-        "deleted": false,
-        "type": "follow"
-      })
-    }).then(() => {
-      const { token, refreshToken } = makeToken(newUser.id, email)
-      return ddbService.putItem(USERS_TABLE_NAME, {
-        email: {S: email},
-        password: {S: hashed},
-        id: {S: newUser.id},
-        enabled: {BOOL: true},
-        refreshToken: {S: refreshToken},
-        nextToken: {S:token},
-        acceptedTOSVersion: {S: '1'},
+        firstName: null,
+        lastName: null,
+        aboutMe: null,
+        profilePhotoID: null,
+        photosByID: {},
+        ridesDefaultPublic: true,
+        type: 'user',
+        createTime: unixTimeNow(),
+        finishedFirstStart: false
+      }).then(newUserRecord => {
+        Logging.log('new user created')
+        newUser = newUserRecord
+        return couchService.createUser(newUser.id)
+      }).then(() => {
+        Logging.log('new couch user created')
+        const newTraining = {
+          "_id": `${newUser.id}_training`,
+          "rides": [],
+          "userID": newUser.id,
+          "lastUpdate": unixTimeNow(),
+          "type": "training"
+        }
+        return slouch.doc.create(USERS_DB, newTraining)
+      }).then(() => {
+        Logging.log('training record created')
+        return slouch.doc.create(USERS_DB, {
+          "_id": `${newUser.id}_${configGet(NICOLE_USER_ID)}`,
+          "followingID": configGet(NICOLE_USER_ID),
+          "followerID": newUser.id,
+          "deleted": false,
+          "type": "follow"
+        })
+      }).then(() => {
+        return slouch.doc.create(USERS_DB, {
+          "_id": `${configGet(NICOLE_USER_ID)}_${newUser.id}`,
+          "followingID": newUser.id,
+          "followerID": configGet(NICOLE_USER_ID),
+          "deleted": false,
+          "type": "follow"
+        })
+      }).then(() => {
+        const { token, refreshToken } = makeToken(newUser.id, email)
+        globalToken = token
+        return ddbService.putItem(USERS_TABLE_NAME, {
+          email: {S: email},
+          password: {S: hashed},
+          id: {S: newUser.id},
+          enabled: {BOOL: true},
+          refreshToken: {S: refreshToken},
+          nextToken: {S:token},
+          acceptedTOSVersion: {S: '1'},
+        })
       }).then(() => {
         Logging.log('ddb record created')
-        res.set('x-auth-token', token).json({
+
+        res.set('x-auth-token', globalToken).json({
           id: newUser.id,
-          token, // remove this when everyone is on > 0.45.0
           following: [configGet(NICOLE_USER_ID)],
           followers: [],
         })
@@ -170,7 +173,7 @@ router.post('/', async (req, res, next) => {
         Logging.log(email)
         return emailer.signupHappened(email)
       })
-    })
+    }
   }).catch(e => {
     next(e)
   })

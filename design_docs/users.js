@@ -5,7 +5,48 @@ export function createUsersDesignDoc (slouch) {
   slouch.db.create(USERS_DB).then(() => {
     slouch.doc.createOrUpdate(USERS_DB, {
       _id: USERS_DESIGN_DOC,
+      validate_doc_update: function (newDoc, oldDoc, userCtx, secObj) {
+        const sourceUserID = userCtx.name
+        if (sourceUserID === 'equesteo') {
+          return
+        }
+
+        if (oldDoc && oldDoc.type !== newDoc.type) {
+          log('bad user update 1')
+          throw({forbidden: `Bad user doc update 1: ${oldDoc._id}, ${sourceUserID}`});
+        }
+
+        if (!oldDoc && newDoc.type === 'follow' && newDoc.followerID !== sourceUserID) {
+          log('bad user update 2')
+          throw({forbidden: `Bad user doc update 2: ${oldDoc._id}, ${sourceUserID}`});
+        }
+        if (oldDoc && oldDoc.type === 'follow' && (oldDoc.followerID !== newDoc.followerID || oldDoc.followingID !== newDoc.followingID)) {
+          log('bad user update 3')
+          throw({forbidden: `Bad user doc update 3: ${oldDoc._id}, ${sourceUserID}`});
+        }
+
+        if (newDoc.type === 'userPhoto' && newDoc.userID !== sourceUserID) {
+          log('bad user update 5')
+          throw({forbidden: `Bad user doc update 5: ${oldDoc._id}, ${sourceUserID}`});
+        }
+
+        if (newDoc.type === 'leaderboards') {
+          log('bad user update 6')
+          throw({forbidden: `Bad user doc update 6: ${oldDoc._id}, ${sourceUserID}`});
+        }
+
+        if (newDoc.type === 'training') {
+          log('bad user update 4')
+          throw({forbidden: `Bad user doc update 4: ${oldDoc._id}, ${sourceUserID}`});
+        }
+      }.toString(),
       views: {
+        types: {
+          map: function (doc) {
+            emit(doc.type, null)
+          }.toString(),
+          reduce: '_count'
+        },
         byID: {
           map: function (doc) {
             if (doc.type === "user") {
