@@ -8,6 +8,7 @@ export const ELASTICSEARCH_HOST = 'ELASTICSEARCH_HOST'
 export const GCM_API_KEY = 'GCM_API_KEY'
 export const LOGGING_TYPE = 'LOGGING_TYPE'
 export const MAPBOX_TOKEN = 'MAPBOX_TOKEN'
+export const MOST_RECENT_DISTRO = 'MOST_RECENT_DISTRO'
 export const NICOLE_USER_ID = 'NICOLE_USER_ID'
 export const NODE_ENV = 'NODE_ENV'
 export const OWN_URL = 'OWN_URL'
@@ -25,6 +26,7 @@ const defaults = {
   ELASTICSEARCH_HOST: 'localhost:9200',
   GCM_API_KEY: 'summtin',
   LOGGING_TYPE: 'dev',
+  MOST_RECENT_DISTRO: 105,
   MAPBOX_TOKEN: 'pk.eyJ1IjoiZXF1ZXN0ZW8iLCJhIjoiY2puM3piMHp5MDJhdzNwbzNnOTQ0cGd1MiJ9.AxXk7ako6f4OMQZB9TUd2A',
   NICOLE_USER_ID: '19e0763a558cfa107eeec280631b1cc1',
   NODE_ENV: 'local',

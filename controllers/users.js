@@ -11,6 +11,7 @@ import {
   COUCH_PASSWORD,
   COUCH_USERNAME,
   ELASTICSEARCH_HOST,
+  MOST_RECENT_DISTRO,
   NICOLE_USER_ID,
 } from "../config"
 import { htID, makeToken, pwResetCode, unixTimeNow } from '../helpers'
@@ -292,7 +293,7 @@ router.post('/setDistribution', authenticator, (req, res, next) => {
         found = { id: {S: id}, distribution: {N: distribution}}
       }
       return ddbService.putItem(FCM_TABLE_NAME, found).then(() => {
-        return res.json({})
+        return res.json({mostRecent: configGet(MOST_RECENT_DISTRO)})
       })
     }).catch(e => {
       next(e)
