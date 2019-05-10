@@ -54,8 +54,8 @@ function checkFilter(req, res, next) {
 }
 
 function userCouchService (id) {
-  return new CouchService(configGet(COUCH_USERNAME), configGet(COUCH_PASSWORD), configGet(COUCH_HOST))
-  // return new CouchService(id, configGet(USER_COUCHDB_PASSWORD), configGet(COUCH_HOST))
+  // return new CouchService(configGet(COUCH_USERNAME), configGet(COUCH_PASSWORD), configGet(COUCH_HOST))
+  return new CouchService(id, configGet(USER_COUCHDB_PASSWORD), configGet(COUCH_HOST))
 }
 
 router.get('/', authenticator, (req, res, next) => {

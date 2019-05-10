@@ -148,13 +148,6 @@ app.get('/rideMap/:url', (req, res, next) => {
   })
 })
 
-
-const couchService = new CouchService(
-  configGet(COUCH_USERNAME),
-  configGet(COUCH_PASSWORD),
-  configGet(COUCH_HOST)
-)
-
 app.get('/replicateProd', async (req, res) => {
   if (configGet(NODE_ENV) !== 'local') {
     return res.json({'not for': "you"})
