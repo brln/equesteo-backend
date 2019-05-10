@@ -18,7 +18,7 @@ export const USER_COUCHDB_PASSWORD = 'USER_COUCHDB_PASSWORD'
 const defaults = {
   AWS_SECRET_ACCESS_KEY: 'asdf',
   AWS_ACCESS_KEY_ID: 'qwer',
-  COUCH_HOST: 'ec2-54-183-185-247.us-west-1.compute.amazonaws.com:5984',
+  COUCH_HOST: 'localhost:5984',
   COUCH_PASSWORD: 'equesteo',
   COUCH_USERNAME: 'equesteo',
   DYNAMODB_ENDPOINT: 'http://localhost:8000',
