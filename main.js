@@ -159,6 +159,7 @@ app.get('/createCouchUsers', (req, res) => {
   const usersTable = 'equesteo_users'
   ddbService.getAllItems(usersTable).then(users => {
     const allPromises = []
+    let lastPromise = Promise.resolve()
     for (let user of users) {
       const id = user.id
       allPromises.push(couchService.getUser(id).then(found => {
@@ -166,7 +167,8 @@ app.get('/createCouchUsers', (req, res) => {
           console.log('already exists')
         } else if (found.error === 'not_found') {
           console.log('making: ' + id)
-          allPromises.push(couchService.createUser(id))
+          lastPromise = lastPromise.then(couchService.createUser(id))
+          allPromises.push(lastPromise)
         } else {
           throw Error('wut?')
         }
