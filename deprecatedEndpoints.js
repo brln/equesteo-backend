@@ -480,3 +480,31 @@ router.get('/createCoords', async (req, res) => {
   await ddbService.createTable('htID', 'S', tableName)
   return res.json({"all": "done"})
 })
+
+app.get('/createCouchUsers', (req, res) => {
+  const usersTable = 'equesteo_users'
+  ddbService.getAllItems(usersTable).then(users => {
+    const allPromises = []
+    let lastPromise = Promise.resolve()
+    for (let user of users) {
+      const id = user.id
+      allPromises.push(couchService.getUser(id).then(found => {
+        if (!found.error) {
+          console.log('already exists')
+        } else if (found.error === 'not_found') {
+          console.log('making: ' + id)
+          lastPromise = lastPromise.then(couchService.createUser(id))
+          allPromises.push(lastPromise)
+        } else {
+          throw Error('wut?')
+        }
+      }))
+    }
+    return Promise.all(allPromises)
+  }).then(resp => {
+    return res.json({all: 'done'})
+  }).catch(e => {
+    next(e)
+  })
+
+})
