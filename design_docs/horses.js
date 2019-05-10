@@ -32,7 +32,7 @@ export function createHorsesDesignDoc (slouch) {
           'horseCareEvent',
         ];
         if (userCheckTypes.indexOf(newDoc.type) > -1 && newDoc.userID !== sourceUserID) {
-          log('bad horse update 3')
+          log(`Bad horse doc update 3: ${oldDoc._id}, ${sourceUserID}`)
           throw({forbidden: `Bad horse doc update 3: ${oldDoc._id}, ${sourceUserID}`});
         }
       }.toString(),
