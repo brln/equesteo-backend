@@ -304,10 +304,11 @@ router.post('/setDistribution', authenticator, (req, res, next) => {
 })
 
 router.post('/feedback', authenticator, (req, res, next) => {
+  const email = res.locals.userEmail
   const id = req.body.id
   const feedback = req.body.feedback
   const emailService = new EmailerService()
-  emailService.sendFeedback(id, feedback).then(() => {
+  emailService.sendFeedback(id, email, feedback).then(() => {
     res.json({})
   })
 })

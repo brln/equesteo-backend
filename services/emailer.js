@@ -33,16 +33,17 @@ export default class EmailerService {
   }
 
 
-  sendFeedback (userID, feedback) {
+  sendFeedback (id, email, feedback) {
     const msg = {
       to: 'info@equesteo.com',
       from: 'info@equesteo.com',
       subject: 'New Feedback!',
-      text: userID + '\n\n\n' + feedback,
+      text: id + '\n\n\n' + email + '\n\n\n' + feedback,
     }
     if (process.env.NODE_ENV === 'production') {
       return sgMail.send(msg);
     } else {
+      console.log(msg)
       return Promise.resolve()
     }
   }
