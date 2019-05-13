@@ -34,8 +34,6 @@ export function createRidesDesignDoc (slouch) {
           'carrot',
           'comment',
           'rideHorse',
-          'rideCoordinates',
-          'rideElevations',
           'ridePhoto',
         ];
         if (userCheckTypes.indexOf(newDoc.type) > -1 && newDoc.userID !== sourceUserID) {
