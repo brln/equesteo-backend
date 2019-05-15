@@ -123,25 +123,33 @@
         });
         // Geographic coordinates of the LineString
         var coordinates = geoJson.features
-        var firstPair = coordinates[0].geometry.coordinates[0]
-        var bounds = coordinates.reduce(function(bounds, coord) {
-            return bounds.extend(coord.geometry.coordinates[0]);
-        }, new mapboxgl.LngLatBounds(firstPair, firstPair));
+        if (coordinates.length > 0) {
+            var firstPair = coordinates[0].geometry.coordinates[0]
+            var bounds = coordinates.reduce(function(bounds, coord) {
+                return bounds.extend(coord.geometry.coordinates[0]);
+            }, new mapboxgl.LngLatBounds(firstPair, firstPair));
 
-        console.log('fitting bounds')
-        map.once('zoomend', function () {
-            map.once('idle', function () {
-                var div = document.createElement("div");
-                div.id ='done'
-                var found = document.getElementById("main")
-                found.appendChild(div);
-                console.log(document.getElementById('done').id)
+            console.log('fitting bounds')
+            map.once('zoomend', function () {
+                map.once('idle', function () {
+                    var div = document.createElement("div");
+                    div.id ='done'
+                    var found = document.getElementById("main")
+                    found.appendChild(div);
+                    console.log(document.getElementById('done').id)
+                })
             })
-        })
-        map.fitBounds(bounds, {
-            padding: { bottom: 120, top: 100, left: 100, right: 100 },
-            duration: 0,
-        })
+            map.fitBounds(bounds, {
+                padding: { bottom: 120, top: 100, left: 100, right: 100 },
+                duration: 0,
+            })
+        } else {
+            var div = document.createElement("div");
+            div.id ='done'
+            var found = document.getElementById("main")
+            found.appendChild(div);
+            console.log(document.getElementById('done').id)
+        }
     });
     </script>
 

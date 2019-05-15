@@ -100,7 +100,7 @@ export function createRidesDesignDoc (slouch) {
         followingRideDocIDs: {
           map: function (doc) {
             if (doc.deleted !== true && doc.type !== 'rideAtlasEntry') {
-              emit(doc.userID)
+              emit(doc.userID, null)
             }
           }.toString()
         },
@@ -113,7 +113,7 @@ export function createRidesDesignDoc (slouch) {
                 || doc.type === 'ridePhoto'
                 || doc.type === 'rideHorse'
               ) {
-                emit(doc.userID)
+                emit(doc.userID, null)
               }
             }
           }.toString()
@@ -121,7 +121,7 @@ export function createRidesDesignDoc (slouch) {
         atlasEntryDocIDs: {
           map: function (doc) {
             if (doc.deleted !== true && doc.type === 'rideAtlasEntry') {
-              emit(doc.userID)
+              emit(doc.userID, null)
             }
           }.toString()
         },
@@ -138,6 +138,22 @@ export function createRidesDesignDoc (slouch) {
           }.toString(),
           reduce: '_count'
         },
+        ridesByTimestamp: {
+          map: function (doc) {
+            if (doc.type === 'ride' && doc.deleted !== true) {
+              emit(doc.userID, doc.startTime)
+            }
+          }.toString()
+        },
+        rideJoins: {
+          map: function (doc) {
+            if (doc.type === 'ride' && doc.deleted !== true) {
+              emit(doc._id, null)
+            } else if (doc.type !== 'ride' && doc.deleted !== true) {
+              emit(doc.rideID, null)
+            }
+          }.toString()
+        }
       },
       filters: {
         byUserIDs: function (doc, req) {

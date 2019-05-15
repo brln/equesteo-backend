@@ -227,6 +227,38 @@ app.get('/replicateProd', async (req, res) => {
   return res.json({'done': "now"})
 })
 
+// app.get('/createCouchUsers', (req, res, next) => {
+//   const usersTable = 'equesteo_users'
+//   const couchService = new CouchService(
+//     configGet(COUCH_USERNAME),
+//     configGet(COUCH_PASSWORD),
+//     configGet(COUCH_HOST)
+//   )
+//   ddbService.getAllItems(usersTable).then(users => {
+//     const allPromises = []
+//     let lastPromise = Promise.resolve()
+//     for (let user of users) {
+//       const id = user.id
+//       allPromises.push(couchService.getUser(id).then(found => {
+//         if (!found.error) {
+//           console.log('already exists')
+//         } else if (found.error === 'not_found') {
+//           console.log('making: ' + id)
+//           lastPromise = lastPromise.then(couchService.createUser(id))
+//           allPromises.push(lastPromise)
+//         } else {
+//           throw Error('wut?')
+//         }
+//       }))
+//     }
+//     return Promise.all(allPromises)
+//   }).then(resp => {
+//     return res.json({all: 'done'})
+//   }).catch(e => {
+//     next(e)
+//   })
+// })
+
 if (configGet(NODE_ENV) !== 'local') {
   app.use(Sentry.Handlers.errorHandler());
 }

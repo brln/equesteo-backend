@@ -11,11 +11,7 @@ const USERS_TABLE_NAME = 'equesteo_users'
 
 const router = express.Router()
 
-const couchService = new CouchService(
-  configGet(COUCH_USERNAME),
-  configGet(COUCH_PASSWORD),
-  configGet(COUCH_HOST)
-)
+
 
 const HORSE_DB = 'horses'
 const NOTIFICATIONS_DB = 'notifications'
