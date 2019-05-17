@@ -34,6 +34,8 @@ const ESClient = new elasticsearch.Client({
   host: configGet(ELASTICSEARCH_HOST),
 })
 
+const emailer = new EmailerService()
+
 const USERS_TABLE_NAME = 'equesteo_users'
 const FCM_TABLE_NAME = 'equesteo_fcm_tokens'
 const HOOF_TRACKS_IDS_TABLE_NAME = 'equesteo_hoof_tracks_ids'
@@ -63,6 +65,7 @@ router.post('/login', async (req, res, next) => {
       refreshToken = madeTokens.refreshToken
       found.refreshToken = {S: refreshToken}
       found.nextToken = {S: token}
+      found.pwResetCode = {NULL: true}
       let following
       let followers
       return ddbService.putItem(USERS_TABLE_NAME, found).then(() => {
@@ -180,26 +183,40 @@ router.post('/', (req, res, next) => {
   })
 })
 
-router.post('/getPWCode', async (req, res) => {
+router.post('/getPWCode', async (req, res, next) => {
   const email = req.body.email
   const ddbService = new DynamoDBService()
-  const found = await ddbService.getItem(USERS_TABLE_NAME, { email: {S: email }})
-  if (found) {
-    if (found.enabled.BOOL === false) {
-      return res.status(401).json({'error': 'Account is disabled.'})
+  ddbService.getItem(USERS_TABLE_NAME, { email: {S: email }}).then(found => {
+    if (!found) {
+      console.log(`email not found: ${email}`)
+      res.set('x-auth-token', null).json({})
+    } else if (found && found.enabled && found.enabled.BOOL === false) {
+      res.status(401).json({'error': 'Account is disabled.'})
     } else {
-      const code = pwResetCode()
-      const noWhitespace = code.replace(/\s+/g, '')
-      found.pwResetCode = {S: noWhitespace}
-      await ddbService.putItem(USERS_TABLE_NAME, found)
-
-      const emailer = new EmailerService()
-      emailer.sendCode(email, code)
+      let code
+      let save
+      if (found.pwResetCode && found.pwResetCode.S) {
+        code = found.pwResetCode.S
+        save = Promise.resolve()
+      } else {
+        code = pwResetCode()
+        const noWhitespace = code.replace(/\s+/g, '')
+        found.pwResetCode = {S: noWhitespace}
+        save = ddbService.putItem(USERS_TABLE_NAME, found)
+      }
+      console.log(code)
+      return save.then(() => {
+        return emailer.sendCode(email, code)
+      }).then(() => {
+        res.set('x-auth-token', null).json({})
+      })
     }
-  }
-  return res.json({})
+  }).catch(e => {
+    next(e)
+  })
 })
 
+// remove when deprecating < 133
 router.post('/exchangePWCode', async (req, res) => {
   const email = req.body.email
   const code = req.body.code.replace(/\s+/g, '').toLowerCase()
@@ -240,6 +257,7 @@ router.post('/exchangePWCode', async (req, res) => {
   }
 })
 
+// remove when deprecating < 133
 router.post('/changePW', authenticator, async (req, res) => {
   const email = res.locals.userEmail
   const password = req.body.password
@@ -252,6 +270,80 @@ router.post('/changePW', authenticator, async (req, res) => {
   await ddbService.putItem(USERS_TABLE_NAME, found)
 
   return res.json({})
+})
+
+router.post('/exchangePWCode2', (req, res, next) => {
+  const email = req.body.email
+  const code = req.body.code.replace(/\s+/g, '').toLowerCase()
+  if (email && code) {
+    const ddbService = new DynamoDBService()
+    ddbService.getItem(USERS_TABLE_NAME, { email: {S: email }}).then(found => {
+      if (!found || !found.pwResetCode.S) {
+        res.status(401).json({'error': 'Wrong email/code.'})
+      } else {
+        console.log(found)
+        const lowerNoWhitespace = found.pwResetCode.S.toLowerCase().replace(/\s+/g, '')
+        if (code !== lowerNoWhitespace) {
+          res.status(401).json({'error': 'Wrong email/code.'})
+        } else {
+          const foundID = found.id.S
+          const { token, refreshToken } = makeToken(foundID, email)
+          found.pwResetCode = {NULL: true}
+          found.refreshToken = { S: refreshToken }
+          found.nextToken = {S: token}
+          return ddbService.putItem(USERS_TABLE_NAME, found).then(() => {
+            res.set('x-auth-token', token).json({})
+          })
+        }
+      }
+    }).catch(e => {
+      res.set('x-auth-token', null)
+      next(e)
+    })
+  } else {
+    res.status(400).json({error: 'Need an email and a code.'})
+  }
+})
+
+router.post('/changePW2', authenticator, (req, res, next) => {
+  const email = res.locals.userEmail
+  const password = req.body.password
+  const hashed = bcrypt.hashSync(password, bcrypt.genSaltSync(10));
+
+  const ddbService = new DynamoDBService()
+  let following
+  ddbService.getItem(USERS_TABLE_NAME, { email: {S: email }}).then(found => {
+    if (!found) {
+      res.status(401).json({'error': 'User does not exist'})
+    } else {
+      const foundID = found.id.S
+      found.password = {S: hashed}
+      return ddbService.putItem(USERS_TABLE_NAME, found).then(() => {
+        return slouch.db.viewArray(
+          USERS_DB,
+          USERS_DESIGN_DOC,
+          'following',
+          { key: `"${foundID}"`}
+        )
+      }).then(_following => {
+        following = _following
+        return slouch.db.viewArray(
+          USERS_DB,
+          USERS_DESIGN_DOC,
+          'followers',
+          { key: `"${foundID}"`}
+        )
+      }).then(followers => {
+        res.json({
+          id: foundID,
+          following:  following.rows.map(f => f.value),
+          followers: followers.rows.map(f => f.value),
+        })
+      })
+    }
+  }).catch(e => {
+    next(e)
+  })
 })
 
 router.post('/setFCMToken', authenticator, (req, res, next) => {

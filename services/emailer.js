@@ -11,7 +11,7 @@ export default class EmailerService {
     sgMail.setApiKey(configGet(SENDGRID_API_TOKEN))
   }
 
-  async sendCode (email, token) {
+  sendCode (email, token) {
     const downcase = token.replace(/\s+/g, '').toLowerCase()
     const b64email = encodeURIComponent(Buffer.from(email).toString('base64'))
     const msg = {
@@ -26,7 +26,7 @@ export default class EmailerService {
       }
     }
     if (process.env.NODE_ENV === 'production') {
-      await sgMail.send(msg);
+      return sgMail.send(msg);
     } else {
       Logging.log(msg)
     }
