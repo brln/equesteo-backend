@@ -18,6 +18,7 @@ import { htID, makeToken, pwResetCode, unixTimeNow } from '../helpers'
 import CouchService from '../services/Couch'
 import DynamoDBService from '../services/dynamoDB'
 import EmailerService from '../services/emailer'
+import SlackService from '../services/Slack'
 import { USERS_DB, USERS_DESIGN_DOC } from "../design_docs/users"
 import Logging from '../services/Logging'
 
@@ -172,10 +173,9 @@ router.post('/', (req, res, next) => {
           following: [configGet(NICOLE_USER_ID)],
           followers: [],
         })
-
-        const emailer = new EmailerService()
-        Logging.log(email)
-        return emailer.signupHappened(email)
+        SlackService.newSignup(email).catch(e => {
+          console.log(e)
+        })
       })
     }
   }).catch(e => {
@@ -399,8 +399,7 @@ router.post('/feedback', authenticator, (req, res, next) => {
   const email = res.locals.userEmail
   const id = req.body.id
   const feedback = req.body.feedback
-  const emailService = new EmailerService()
-  emailService.sendFeedback(id, email, feedback).then(() => {
+  SlackService.newFeedback(id, email, feedback).then(() => {
     res.json({})
   })
 })
