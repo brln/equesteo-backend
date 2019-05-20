@@ -6,8 +6,8 @@ import DynamoDBService from './services/dynamoDB'
 import Logging from './services/Logging'
 
 const USERS_TABLE_NAME = 'equesteo_users'
-const TOKEN_EXPIRATION = 1000 * 60 * 18
-const TOKEN_ALLOWED_OVERLAP = 1000 * 60 * 5
+const TOKEN_EXPIRATION = 1000 * 60 * 120
+const TOKEN_ALLOWED_OVERLAP = 1000 * 60 * 30
 
 const refreshTokenCache = {}
 const clearOldTokenTimeouts = {}
