@@ -1,8 +1,8 @@
 import express from 'express'
 import * as Sentry from '@sentry/node'
 
-import { authenticator } from '../auth'
-import {configGet, COUCH_HOST, COUCH_USERNAME, COUCH_PASSWORD, USER_COUCHDB_PASSWORD} from '../config'
+import { couchAuthenticator } from '../auth'
+import {configGet, COUCH_HOST, USER_COUCHDB_PASSWORD} from '../config'
 import CouchService from '../services/Couch'
 import DynamoDBService from '../services/dynamoDB'
 import Logging from '../services/Logging'
@@ -54,73 +54,73 @@ function userCouchService (id) {
   return new CouchService(id, configGet(USER_COUCHDB_PASSWORD), configGet(COUCH_HOST))
 }
 
-router.get('/', authenticator, (req, res, next) => {
+router.get('/', couchAuthenticator, (req, res, next) => {
   const uCouchService = userCouchService(res.locals.userID)
   req.pipe(uCouchService.getInfo()).pipe(res)
 })
 
-router.get(`/${DB_REG}/`, authenticator, checkDB, (req, res, next) => {
+router.get(`/${DB_REG}/`, couchAuthenticator, checkDB, (req, res, next) => {
   const uCouchService = userCouchService(res.locals.userID)
   req.pipe(uCouchService.getDBInfo(req.params.db)).pipe(res)
 })
 
-router.get(`/${DB_REG}/_local/:id`, authenticator, checkDB, (req, res, next) => {
+router.get(`/${DB_REG}/_local/:id`, couchAuthenticator, checkDB, (req, res, next) => {
   const uCouchService = userCouchService(res.locals.userID)
   req.pipe(uCouchService.getLocalDoc(req.params.db, req.params.id, req.query)).pipe(res)
 })
 
-router.put(`/${DB_REG}/_local/:id`, authenticator, checkDB, (req, res, next) => {
+router.put(`/${DB_REG}/_local/:id`, couchAuthenticator, checkDB, (req, res, next) => {
   const uCouchService = userCouchService(res.locals.userID)
   req.pipe(uCouchService.putLocalDoc(req.params.db, req.params.id, req.query)).pipe(res)
 })
 
-router.post(`/${DB_REG}/_revs_diff`, authenticator, checkDB, (req, res, next) => {
+router.post(`/${DB_REG}/_revs_diff`, couchAuthenticator, checkDB, (req, res, next) => {
   const uCouchService = userCouchService(res.locals.userID)
   req.pipe(uCouchService.postRevDiffs(req.params.db, req.query)).pipe(res)
 })
 
-router.get(`/${DB_REG}/_revs_diff`, authenticator, checkDB, (req, res, next) => {
+router.get(`/${DB_REG}/_revs_diff`, couchAuthenticator, checkDB, (req, res, next) => {
   const uCouchService = userCouchService(res.locals.userID)
   req.pipe(uCouchService.getRevDiffs(req.params.db, req.query)).pipe(res)
 })
 
-router.get(`/${DB_REG}/_design/:designDoc/_view/:view`, checkDB, authenticator, (req, res, next) => {
+router.get(`/${DB_REG}/_design/:designDoc/_view/:view`, checkDB, couchAuthenticator, (req, res, next) => {
   const uCouchService = userCouchService(res.locals.userID)
   req.pipe(uCouchService.getView(req.params.db, req.params.designDoc, req.params.view, req.query)).pipe(res)
 })
 
-router.post(`/${DB_REG}/_design/:designDoc/_view/:view`, checkDB, authenticator, (req, res, next) => {
+router.post(`/${DB_REG}/_design/:designDoc/_view/:view`, checkDB, couchAuthenticator, (req, res, next) => {
   // Same thing as GET view but posts the ids when they don`t fit in url
   const uCouchService = userCouchService(res.locals.userID)
   req.pipe(uCouchService.postView(req.params.db, req.params.designDoc, req.params.view, req.query)).pipe(res)
 })
 
-router.post(`/${DB_REG}/_changes`, authenticator, checkDB, (req, res, next) => {
+router.post(`/${DB_REG}/_changes`, couchAuthenticator, checkDB, (req, res, next) => {
   const uCouchService = userCouchService(res.locals.userID)
   req.pipe(uCouchService.postChanges(req.params.db, req.query)).pipe(res)
 })
 
-router.get(`/${DB_REG}/_changes`, authenticator, checkDB, checkFilter, (req, res, next) => {
+router.get(`/${DB_REG}/_changes`, couchAuthenticator, checkDB, checkFilter, (req, res, next) => {
   const uCouchService = userCouchService(res.locals.userID)
   req.pipe(uCouchService.getChanges(req.params.db, req.query)).pipe(res)
 })
 
-router.post(`/${DB_REG}/_all_docs`, authenticator, checkDB, (req, res, next) => {
+router.post(`/${DB_REG}/_all_docs`, couchAuthenticator, checkDB, (req, res, next) => {
   const uCouchService = userCouchService(res.locals.userID)
   req.pipe(uCouchService.postAllDocs(req.params.db, req.query)).pipe(res)
 })
 
-router.post(`/${DB_REG}/_bulk_docs`, authenticator, checkDB, (req, res, next) => {
+router.post(`/${DB_REG}/_bulk_docs`, couchAuthenticator, checkDB, (req, res, next) => {
   const uCouchService = userCouchService(res.locals.userID)
   req.pipe(uCouchService.postBulkDocs(req.params.db, req.query)).pipe(res)
 })
 
-router.post(`/${DB_REG}/_bulk_get`, authenticator, checkDB, (req, res, next) => {
+router.post(`/${DB_REG}/_bulk_get`, couchAuthenticator, checkDB, (req, res, next) => {
   const uCouchService = userCouchService(res.locals.userID)
   req.pipe(uCouchService.postBulkGet(req.params.db, req.query)).pipe(res)
 })
 
-router.get(`/${DB_REG}/:id`, authenticator, checkDB, (req, res, next) => {
+router.get(`/${DB_REG}/:id`, couchAuthenticator, checkDB, (req, res, next) => {
   const uCouchService = userCouchService(res.locals.userID)
   req.pipe(uCouchService.getItem(req.params.db, req.params.id, req.query)).pipe(res)
 })
@@ -145,11 +145,11 @@ function badRoute (req, res, next) {
   res.sendStatus(401)
 }
 
-router.get('/*', authenticator, badRoute)
-router.post('/*', authenticator, badRoute)
-router.put('/*', authenticator, badRoute)
-router.patch('/*', authenticator, badRoute)
-router.delete('/*', authenticator, badRoute)
+router.get('/*', couchAuthenticator, badRoute)
+router.post('/*', couchAuthenticator, badRoute)
+router.put('/*', couchAuthenticator, badRoute)
+router.patch('/*', couchAuthenticator, badRoute)
+router.delete('/*', couchAuthenticator, badRoute)
 
 
 

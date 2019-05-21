@@ -1,6 +1,5 @@
 import request from 'request'
-
-import RideMap from './RideMap'
+import { configGet, NODE_ENV } from '../config'
 
 export default class SlackService {
   static newSignup (email) {
@@ -22,25 +21,25 @@ export default class SlackService {
     const uri = `https://api.equesteo.com/rideMap/${encodedURL}`
     const message = {
       "attachments": [
-          {
-              "color": "#36a64f",
-              "pretext": name,
-              "author_name": userName,
-              "fields": [
-                  {
-                      "title": "Distance",
-                      "value": distance,
-                      "short": true
-                  },
-                  {
-                    "title": "Time",
-                    "value": time,
-                    "short": false
-                  }
-              ],
-              "image_url": uri,
-              "ts": startTime / 1000
-          }
+        {
+          "color": "#36a64f",
+          "pretext": name,
+          "author_name": userName,
+          "fields": [
+            {
+              "title": "Distance",
+              "value": distance,
+              "short": true
+            },
+            {
+              "title": "Time",
+              "value": time,
+              "short": false
+            }
+          ],
+          "image_url": uri,
+          "ts": startTime / 1000
+        }
       ]
     }
 
@@ -53,6 +52,9 @@ export default class SlackService {
   }
 
   static request (webhook, text, formatted) {
+    if (configGet(NODE_ENV) === 'local') {
+      return Promise.resolve()
+    }
     if (!formatted) {
       formatted = {text}
     }

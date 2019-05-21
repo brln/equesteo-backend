@@ -6,12 +6,67 @@ import DynamoDBService from './services/dynamoDB'
 import Logging from './services/Logging'
 
 const USERS_TABLE_NAME = 'equesteo_users'
-const TOKEN_EXPIRATION = 1000 * 60 * 120
-const TOKEN_ALLOWED_OVERLAP = 1000 * 60 * 30
+const TOKEN_EXPIRATION = 1000 * 60 * 60
+const TOKEN_ALLOWED_OVERLAP = 1000 * 60 * 5
 
 const refreshTokenCache = {}
 const clearOldTokenTimeouts = {}
 const fetchCount = {}
+
+export const couchAuthenticator = (req, res, next) => {
+  const authHeader = req.headers.authorization
+  if (authHeader) {
+    let token = req.headers.authorization.split('Bearer: ')[1]
+    let decoded = undefined
+    try {
+      decoded = jwt.verify(token, configGet(TOP_SECRET_JWT_TOKEN))
+    } catch (e) {
+      return res.status(400).json({error: 'Invalid Token'})
+    }
+    res.locals.userID = decoded.id
+    res.locals.userEmail = decoded.email
+
+    if (!token || !decoded || !decoded.createdAt) {
+      return res.status(401).json({error: 'Invalid Authorization header'})
+    }
+
+    const timeDiff = unixTimeNow() - decoded.createdAt
+    if (timeDiff > TOKEN_EXPIRATION) {
+      Logging.log('Token is expired, fetching a new one')
+      const email = decoded.email
+      const incomingRefreshToken = decoded.refreshToken
+      const ddbService = new DynamoDBService()
+      !fetchCount[email] ? fetchCount[email] = 1 : fetchCount[email] += 1
+      ddbService.getItem(USERS_TABLE_NAME, { email: {S: email }}).then(found => {
+        fetchCount[email] === 1 ? delete fetchCount[email] : fetchCount[email] -= 1
+        if (!found) {
+          return res.status(401).json({error: 'Account not found.'})
+        }
+        if (found.enabled.BOOL === false) {
+          return res.status(401).json({error: 'Account is disabled.'})
+        }
+
+        const foundRefreshToken = found.refreshToken ? found.refreshToken.S : null
+        const foundOldToken = found.oldToken ? found.oldToken.S : null
+
+        if (incomingRefreshToken === foundRefreshToken || incomingRefreshToken === foundOldToken) {
+          Logging.log('couch auth match')
+          next()
+        } else {
+          Logging.log('attempted auth with expired token')
+          return res.status(401).json({error: 'Bad Token.'})
+        }
+      }).catch(e => {
+        next(e)
+      })
+    } else {
+      res.set('x-auth-token', token)
+      next()
+    }
+  } else {
+    return res.status(401).json({error: 'Authorization header required'})
+  }
+}
 
 export const authenticator = (req, res, next) => {
   const authHeader = req.headers.authorization
