@@ -5,12 +5,13 @@ import { HORSES_DB, HORSES_DESIGN_DOC } from "../design_docs/horses"
 import { NOTIFICATIONS_DB} from "../design_docs/notifications"
 import { RIDES_DB, RIDES_DESIGN_DOC } from "../design_docs/rides"
 import { USERS_DB, USERS_DESIGN_DOC } from "../design_docs/users"
-import { unixTimeNow, userName, randU32Sync } from '../helpers'
+import { unixTimeNow, userName, randU32Sync, timeToString } from '../helpers'
 import {calcLeaderboards, summarizeRides } from './helpers'
 import { configGet, COUCH_USERNAME, COUCH_PASSWORD, COUCH_HOST } from '../config'
 import CouchService from '../services/Couch'
 import GCMService from '../services/GCM'
 import Logging from '../services/Logging'
+import SlackService from '../services/Slack'
 
 const TABLE_NAME = 'equesteo_fcm_tokens'
 
@@ -347,6 +348,18 @@ function newRideNotification (rideRecord, slouch, gcmClient, ddbService) {
     if (!userID) {
       throw Error('wut why not')
     }
+    const userPromise = slouch.doc.get(USERS_DB, rideRecord.doc.userID)
+    userPromise.then(userRecord => {
+      SlackService.newRide(
+        rideRecord.doc.mapURL,
+        rideRecord.doc.startTime,
+        rideRecord.doc.name,
+        userName(userRecord.firstName, userRecord.lastName),
+        rideRecord.doc.distance.toFixed(2),
+        timeToString(rideRecord.doc.elapsedTimeSecs),
+      )
+    })
+
 
     const followersPromise = slouch.db.viewArray(
       USERS_DB,
@@ -354,7 +367,7 @@ function newRideNotification (rideRecord, slouch, gcmClient, ddbService) {
       'followers',
       {key: `"${userID}"`}
     )
-    const userPromise = slouch.doc.get(USERS_DB, rideRecord.doc.userID)
+
     let userRecord
     let followers
     let ddbRecords

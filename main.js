@@ -1,7 +1,5 @@
 import aws from 'aws-sdk'
-import murmur from 'murmurhash-js'
 import express from 'express'
-import fetch from 'node-fetch'
 import gcm from 'node-gcm'
 import logger from 'morgan'
 import Slouch from 'couch-slouch'
@@ -19,7 +17,6 @@ import {
   ELASTICSEARCH_HOST,
   GCM_API_KEY,
   LOGGING_TYPE,
-  MAPBOX_TOKEN,
   NODE_ENV,
 } from "./config"
 import {
@@ -37,9 +34,8 @@ import { createNotificationsDesignDoc } from "./design_docs/notifications"
 import startRideChangeIterator from './ChangeIterators/rides'
 import startUsersChangeIterator from './ChangeIterators/users'
 import DynamoDBService from './services/dynamoDB'
-import S3Service from './services/s3'
 import Logging from './services/Logging'
-import CouchService from "./services/Couch"
+import RideMap from './services/RideMap'
 
 
 const app = express()
@@ -107,45 +103,16 @@ app.get('/checkConnection', authenticator, (req, res) => {
 
 
 app.get('/rideMap/:url', (req, res, next) => {
-  const decoded = new Buffer(req.params.url, 'base64').toString('ascii')
-  if (!decoded.startsWith('https://api.mapbox.com/styles/v1/equesteo/')) {
-    return res.sendStatus(400)
-  }
-
-  const hashKey = `${murmur.murmur3(decoded, 'equesteo-map-url')}.png`
-
-  const BUCKET_NAME = 'equesteo-ride-maps'
-  const s3Service = new S3Service()
-  let found = false
-  let fromMapbox
-  s3Service.get(BUCKET_NAME, hashKey).then(data => {
-    found = true
-    return data.Body
-  }).catch(() => { Logging.log(`${hashKey} not found`)}).then(data => {
-    if (found) {
-      return data
-    } else {
-      return fetch(decoded + `?access_token=${configGet(MAPBOX_TOKEN)}`).then(resp => {
-        Logging.log('fetching from mapbox')
-        return resp.buffer()
-      }).then(data => {
-        Logging.log('reading mapbox buffer')
-        fromMapbox = data
-        return data
-      })
-    }
-  }).then(imageData => {
+  const success = (imageData) => {
     res.setHeader("content-type", "image/png")
     return res.send(imageData)
-  }).then(() => {
-    if (!found) {
-      return s3Service.put(BUCKET_NAME, hashKey, fromMapbox).then(() => {
-        Logging.log(`cached ${hashKey}`)
-      }).catch(e => {
-        Logging.log(e)
-      })
-    }
-  })
+  }
+
+  const error = () => {
+    return res.sendStatus(400)
+  }
+  const decoded = new Buffer(req.params.url, 'base64').toString('ascii')
+  RideMap.getOrFetch(decoded, error, success)
 })
 
 app.get('/replicateProd', async (req, res) => {
