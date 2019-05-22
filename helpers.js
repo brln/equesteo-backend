@@ -296,6 +296,6 @@ export function randU32Sync() {
 
 export function htID () {
   return [0, 0, 0].map(_ => {
-    return (Math.random().toString(36)+'00000000000000000').slice(2, 5).toUpperCase().replace('O', 'Q', '0', 'Z')
+    return (Math.random().toString(36)+'00000000000000000').slice(2, 5).toUpperCase().replace(/O/g, 'Q').replace(/0/g, 'Z')
   }).join('-')
 }
