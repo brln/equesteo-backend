@@ -111,7 +111,7 @@ app.get('/checkAuth', authenticator, (req, res) => {
   return res.json({})
 })
 
-app.get('/checkConnection', (req, res) => {
+app.get('/checkConnection', authenticator, (req, res) => {
   return res.json({connected: true})
 })
 
