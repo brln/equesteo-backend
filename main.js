@@ -1,7 +1,7 @@
 import aws from 'aws-sdk'
 import express from 'express'
 import gcm from 'node-gcm'
-import logger from 'morgan'
+import morgan from 'morgan'
 import Slouch from 'couch-slouch'
 import elasticsearch from 'elasticsearch'
 import * as Sentry from '@sentry/node'
@@ -16,7 +16,6 @@ import {
   COUCH_USERNAME,
   ELASTICSEARCH_HOST,
   GCM_API_KEY,
-  LOGGING_TYPE,
   NODE_ENV,
 } from "./config"
 import {
@@ -30,6 +29,7 @@ import { createUsersDesignDoc, USERS_DB } from "./design_docs/users"
 import { createHorsesDesignDoc, HORSES_DB } from "./design_docs/horses"
 import { createRidesDesignDoc, RIDES_DB } from './design_docs/rides'
 import { createNotificationsDesignDoc } from "./design_docs/notifications"
+import CouchService from './services/Couch'
 
 import startRideChangeIterator from './ChangeIterators/rides'
 import startUsersChangeIterator from './ChangeIterators/users'
@@ -39,7 +39,21 @@ import RideMap from './services/RideMap'
 
 
 const app = express()
-app.use(logger(configGet(LOGGING_TYPE)))
+
+const logger = morgan(function (tokens, req, res) {
+  return [
+    tokens['id'](res), '-',
+    tokens.method(req, res),
+    tokens.url(req, res),
+    tokens.status(req, res),
+    tokens.res(req, res, 'content-length'), '-',
+    tokens['response-time'](req, res), 'ms',
+  ].join(' ')
+})
+morgan.token('id', function getId (res) {
+  return res.locals ? res.locals.userID : null
+})
+app.use(logger)
 
 if (configGet(NODE_ENV) !== 'local') {
   Sentry.init({dsn: 'https://04b0f2944b3d43af8fc7d039a8bb6359@sentry.io/1305626'})
@@ -97,7 +111,7 @@ app.get('/checkAuth', authenticator, (req, res) => {
   return res.json({})
 })
 
-app.get('/checkConnection', authenticator, (req, res) => {
+app.get('/checkConnection', (req, res) => {
   return res.json({connected: true})
 })
 
@@ -194,37 +208,40 @@ app.get('/replicateProd', async (req, res) => {
   return res.json({'done': "now"})
 })
 
-// app.get('/createCouchUsers', (req, res, next) => {
-//   const usersTable = 'equesteo_users'
-//   const couchService = new CouchService(
-//     configGet(COUCH_USERNAME),
-//     configGet(COUCH_PASSWORD),
-//     configGet(COUCH_HOST)
-//   )
-//   ddbService.getAllItems(usersTable).then(users => {
-//     const allPromises = []
-//     let lastPromise = Promise.resolve()
-//     for (let user of users) {
-//       const id = user.id
-//       allPromises.push(couchService.getUser(id).then(found => {
-//         if (!found.error) {
-//           console.log('already exists')
-//         } else if (found.error === 'not_found') {
-//           console.log('making: ' + id)
-//           lastPromise = lastPromise.then(couchService.createUser(id))
-//           allPromises.push(lastPromise)
-//         } else {
-//           throw Error('wut?')
-//         }
-//       }))
-//     }
-//     return Promise.all(allPromises)
-//   }).then(resp => {
-//     return res.json({all: 'done'})
-//   }).catch(e => {
-//     next(e)
-//   })
-// })
+app.get('/createCouchUsers', (req, res, next) => {
+  if (configGet(NODE_ENV) !== 'local') {
+    return res.json({'not for': "you"})
+  }
+  const usersTable = 'equesteo_users'
+  const couchService = new CouchService(
+    configGet(COUCH_USERNAME),
+    configGet(COUCH_PASSWORD),
+    configGet(COUCH_HOST)
+  )
+  ddbService.getAllItems(usersTable).then(users => {
+    const allPromises = []
+    let lastPromise = Promise.resolve()
+    for (let user of users) {
+      const id = user.id
+      allPromises.push(couchService.getUser(id).then(found => {
+        if (!found.error) {
+          console.log('already exists')
+        } else if (found.error === 'not_found') {
+          console.log('making: ' + id)
+          lastPromise = lastPromise.then(couchService.createUser(id))
+          allPromises.push(lastPromise)
+        } else {
+          throw Error('wut?')
+        }
+      }))
+    }
+    return Promise.all(allPromises)
+  }).then(resp => {
+    return res.json({all: 'done'})
+  }).catch(e => {
+    next(e)
+  })
+})
 
 if (configGet(NODE_ENV) !== 'local') {
   app.use(Sentry.Handlers.errorHandler());
