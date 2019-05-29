@@ -42,6 +42,7 @@ const app = express()
 
 const logger = morgan(function (tokens, req, res) {
   return [
+    tokens.date(req, res, 'iso'), '-',
     tokens['id'](res), '-',
     tokens.method(req, res),
     tokens.url(req, res),
