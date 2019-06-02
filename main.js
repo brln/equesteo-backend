@@ -116,6 +116,9 @@ app.get('/checkConnection', authenticator, (req, res) => {
   return res.json({connected: true})
 })
 
+app.get('/checkConnection2', (req, res) => {
+  return res.json({connected: true})
+})
 
 app.get('/rideMap/:url', (req, res, next) => {
   const success = (imageData) => {

@@ -366,6 +366,8 @@ router.post('/setFCMToken', authenticator, (req, res, next) => {
 })
 
 router.post('/setDistribution', authenticator, (req, res, next) => {
+  // @TODO: this endpoint and the one above probably end up in a race
+  // @TODO: condition where they overwrite each other!
   const id = req.body.id
   const distribution = req.body.distribution
   const ddbService = new DynamoDBService()
