@@ -85,8 +85,7 @@ function recalcTrainingRecords(rideRecord, slouch) {
   // If there is a new ride
   let leaderboardRecalc = false
   if (rideRecord.doc && rideRecord.doc.type === 'ride'
-      && rideRecord.doc._rev.split('-')[0] === '1'
-      && rideRecord.doc.isPublic === true) {
+      && rideRecord.doc._rev.split('-')[0] === '1') {
     Logging.log('new ride training recalc')
     leaderboardRecalc = true
     const rideID = rideRecord.doc._id
@@ -142,8 +141,7 @@ function recalcTrainingRecords(rideRecord, slouch) {
 
     // If this is an old ride that was edited.
   } else if (rideRecord.doc && rideRecord.doc.type === 'ride'
-    && parseInt(rideRecord.doc._rev.split('-')[0]) > 1
-    && rideRecord.doc.isPublic === true) {
+    && parseInt(rideRecord.doc._rev.split('-')[0]) > 1) {
     Logging.log('ride update training recalc')
     leaderboardRecalc = true
     const key = `"${rideRecord.doc._id}"`
