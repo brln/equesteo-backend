@@ -13,31 +13,31 @@ export function createUsersDesignDoc (slouch) {
 
         if (oldDoc && oldDoc.type !== newDoc.type) {
           log('bad user update 1')
-          throw({forbidden: `Bad user doc update 1: ${oldDoc._id}, ${sourceUserID}`});
+          throw({forbidden: `Bad user doc update 1: ${newDoc._id}, ${sourceUserID}`});
         }
 
         if (!oldDoc && newDoc.type === 'follow' && newDoc.followerID !== sourceUserID) {
           log('bad user update 2')
-          throw({forbidden: `Bad user doc update 2: ${oldDoc._id}, ${sourceUserID}`});
+          throw({forbidden: `Bad user doc update 2: ${newDoc._id}, ${sourceUserID}`});
         }
         if (oldDoc && oldDoc.type === 'follow' && (oldDoc.followerID !== newDoc.followerID || oldDoc.followingID !== newDoc.followingID)) {
           log('bad user update 3')
-          throw({forbidden: `Bad user doc update 3: ${oldDoc._id}, ${sourceUserID}`});
+          throw({forbidden: `Bad user doc update 3: ${newDoc._id}, ${sourceUserID}`});
         }
 
         if (newDoc.type === 'userPhoto' && newDoc.userID !== sourceUserID) {
           log('bad user update 5')
-          throw({forbidden: `Bad user doc update 5: ${oldDoc._id}, ${sourceUserID}`});
+          throw({forbidden: `Bad user doc update 5: ${newDoc._id}, ${sourceUserID}`});
         }
 
         if (newDoc.type === 'leaderboards') {
           log('bad user update 6')
-          throw({forbidden: `Bad user doc update 6: ${oldDoc._id}, ${sourceUserID}`});
+          throw({forbidden: `Bad user doc update 6: ${newDoc._id}, ${sourceUserID}`});
         }
 
         if (newDoc.type === 'training') {
           log('bad user update 4')
-          throw({forbidden: `Bad user doc update 4: ${oldDoc._id}, ${sourceUserID}`});
+          throw({forbidden: `Bad user doc update 4: ${newDoc._id}, ${sourceUserID}`});
         }
       }.toString(),
       views: {

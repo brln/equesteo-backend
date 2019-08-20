@@ -13,7 +13,7 @@ export function createRidesDesignDoc (slouch) {
 
         if (oldDoc && oldDoc.type !== newDoc.type) {
           log('bad ride update 1')
-          throw({forbidden: `Bad ride doc update 1: ${oldDoc._id}, ${sourceUserID}`});
+          throw({forbidden: `Bad ride doc update 1: ${newDoc._id}, ${sourceUserID}`});
         }
         const allTypes = [
           'carrot',
@@ -27,7 +27,7 @@ export function createRidesDesignDoc (slouch) {
         ]
         if (!newDoc.type || allTypes.indexOf(newDoc.type) < 0) {
           log('bad ride update 2')
-          throw({forbidden: `Bad ride doc update 2: ${oldDoc._id}, ${sourceUserID}`});
+          throw({forbidden: `Bad ride doc update 2: ${newDoc._id}, ${sourceUserID}`});
         }
 
         const userCheckTypes = [
@@ -38,12 +38,12 @@ export function createRidesDesignDoc (slouch) {
         ];
         if (userCheckTypes.indexOf(newDoc.type) > -1 && newDoc.userID !== sourceUserID) {
           log('bad ride update 3')
-          throw({forbidden: `Bad ride doc update 3: ${oldDoc._id}, ${sourceUserID}, ${newDoc.type}`});
+          throw({forbidden: `Bad ride doc update 3: ${newDoc._id}, ${sourceUserID}, ${newDoc.type}`});
         }
 
         if (newDoc.type === 'ride' && newDoc.userID !== sourceUserID && !newDoc.duplicateFrom) {
           log('bad ride update 4')
-          throw({forbidden: `Bad ride doc update 4: ${oldDoc._id}, ${sourceUserID}, ${newDoc.type}`});
+          throw({forbidden: `Bad ride doc update 4: ${newDoc._id}, ${sourceUserID}, ${newDoc.type}`});
         }
       }.toString(),
       views: {

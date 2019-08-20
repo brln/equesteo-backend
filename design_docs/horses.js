@@ -13,7 +13,7 @@ export function createHorsesDesignDoc (slouch) {
 
         if (oldDoc && oldDoc.type !== newDoc.type) {
           log('bad horse update 1')
-          throw({forbidden: `Bad horse doc update 1: ${oldDoc._id}, ${sourceUserID}`});
+          throw({forbidden: `Bad horse doc update 1: ${newDoc._id}, ${sourceUserID}`});
         }
         const allTypes = [
           'careEvent',
@@ -24,7 +24,7 @@ export function createHorsesDesignDoc (slouch) {
         ]
         if (!newDoc.type || allTypes.indexOf(newDoc.type) < 0) {
           log('bad horse update 2')
-          throw({forbidden: `Bad horse doc update 2: ${oldDoc._id}, ${sourceUserID}`});
+          throw({forbidden: `Bad horse doc update 2: ${newDoc._id}, ${sourceUserID}`});
         }
 
         const userCheckTypes = [
@@ -32,8 +32,8 @@ export function createHorsesDesignDoc (slouch) {
           'horseCareEvent',
         ];
         if (userCheckTypes.indexOf(newDoc.type) > -1 && newDoc.userID !== sourceUserID) {
-          log(`Bad horse doc update 3: ${oldDoc._id}, ${sourceUserID}`)
-          throw({forbidden: `Bad horse doc update 3: ${oldDoc._id}, ${sourceUserID}`});
+          log(`Bad horse doc update 3: ${newDoc._id}, ${sourceUserID}`)
+          throw({forbidden: `Bad horse doc update 3: ${newDoc._id}, ${sourceUserID}`});
         }
       }.toString(),
       views: {

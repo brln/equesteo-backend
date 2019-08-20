@@ -21,6 +21,7 @@ export const couchAuthenticator = (req, res, next) => {
     try {
       decoded = jwt.verify(token, configGet(TOP_SECRET_JWT_TOKEN))
     } catch (e) {
+      Logging.log('CouchAuth: Invalid Token: ' + token)
       return res.status(400).json({error: 'Invalid Token'})
     }
     res.locals.userID = decoded.id
@@ -76,6 +77,7 @@ export const authenticator = (req, res, next) => {
     try {
       decoded = jwt.verify(token, configGet(TOP_SECRET_JWT_TOKEN))
     } catch (e) {
+      Logging.log('Auth: Invalid Token: ' + token)
       return res.status(400).json({error: 'Invalid Token'})
     }
     res.locals.userID = decoded.id

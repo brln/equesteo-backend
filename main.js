@@ -28,6 +28,7 @@ import {
 import { createUsersDesignDoc, USERS_DB } from "./design_docs/users"
 import { createHorsesDesignDoc, HORSES_DB } from "./design_docs/horses"
 import { createRidesDesignDoc, RIDES_DB } from './design_docs/rides'
+import { NOTIFICATIONS_DB } from './design_docs/notifications'
 import { createNotificationsDesignDoc } from "./design_docs/notifications"
 import CouchService from './services/Couch'
 
@@ -44,9 +45,9 @@ const logger = morgan(function (tokens, req, res) {
   return [
     tokens.date(req, res, 'iso'), '-',
     tokens['id'](res), '-',
+    tokens.status(req, res),
     tokens.method(req, res),
     tokens.url(req, res),
-    tokens.status(req, res),
     tokens.res(req, res, 'content-length'), '-',
     tokens['response-time'](req, res), 'ms',
   ].join(' ')
@@ -143,6 +144,7 @@ app.get('/replicateProd', async (req, res) => {
       slouch.db.destroy(RIDES_DB),
       slouch.db.destroy(USERS_DB),
       slouch.db.destroy(HORSES_DB),
+      slouch.db.destroy(NOTIFICATIONS_DB),
     ]
     try {
       await Promise.all(destroys)
@@ -157,6 +159,7 @@ app.get('/replicateProd', async (req, res) => {
       slouch.db.create(RIDES_DB),
       slouch.db.create(USERS_DB),
       slouch.db.create(HORSES_DB),
+      slouch.db.create(NOTIFICATIONS_DB),
     ]
     try {
       await Promise.all(creates)
@@ -223,25 +226,26 @@ app.get('/createCouchUsers', (req, res, next) => {
     configGet(COUCH_HOST)
   )
   ddbService.getAllItems(usersTable).then(users => {
-    const allPromises = []
     let lastPromise = Promise.resolve()
     for (let user of users) {
       const id = user.id
-      allPromises.push(couchService.getUser(id).then(found => {
-        if (!found.error) {
-          console.log('already exists')
-        } else if (found.error === 'not_found') {
-          console.log('making: ' + id)
-          lastPromise = lastPromise.then(couchService.createUser(id))
-          allPromises.push(lastPromise)
-        } else {
-          throw Error('wut?')
-        }
-      }))
+      lastPromise = lastPromise.then(() => {
+        return couchService.getUser(id).then(found => {
+          if (!found.error) {
+            console.log('already exists')
+            return Promise.resolve()
+          } else if (found.error === 'not_found') {
+            console.log('making: ' + id)
+            return couchService.createUser(id)
+          } else {
+            throw Error('wut?')
+          }
+        })
+      })
     }
-    return Promise.all(allPromises)
-  }).then(resp => {
-    return res.json({all: 'done'})
+    return lastPromise.then(resp => {
+      return res.json({all: 'done'})
+    })
   }).catch(e => {
     next(e)
   })

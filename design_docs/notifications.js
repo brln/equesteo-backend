@@ -13,16 +13,16 @@ export function createNotificationsDesignDoc (slouch) {
 
         if (oldDoc && oldDoc.type !== newDoc.type) {
           log('bad notification update 1')
-          throw({forbidden: `Bad notification update 1: ${oldDoc._id}, ${sourceUserID}`});
+          throw({forbidden: `Bad notification update 1: ${newDoc._id}, ${sourceUserID}`});
         }
         if (!newDoc.type || newDoc.type !== 'notification') {
           log('bad notification update 2')
-          throw({forbidden: `Bad notification doc update 2: ${oldDoc._id}, ${sourceUserID}`});
+          throw({forbidden: `Bad notification doc update 2: ${newDoc._id}, ${sourceUserID}`});
         }
 
         if (sourceUserID !== newDoc.userID) {
-          log(`Bad notification doc update 3: ${oldDoc._id}, ${sourceUserID}`)
-          throw({forbidden: `Bad notification doc update 3: ${oldDoc._id}, ${sourceUserID}`});
+          log(`Bad notification doc update 3: ${newDoc._id}, ${sourceUserID}`)
+          throw({forbidden: `Bad notification doc update 3: ${newDoc._id}, ${sourceUserID}`});
         }
       }.toString(),
       views: {

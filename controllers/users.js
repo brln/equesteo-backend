@@ -107,7 +107,7 @@ router.post('/', (req, res, next) => {
   const ddbService = new DynamoDBService()
   ddbService.getItem(USERS_TABLE_NAME, { email: { S: email }}).then(found => {
     if (found) {
-      res.status(400).json({'error': 'User already exists'})
+      res.status(409).json({'error': 'User already exists'})
     } else {
       let newUser
       const hashed = bcrypt.hashSync(password, bcrypt.genSaltSync(10));
