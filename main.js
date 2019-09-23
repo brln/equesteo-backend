@@ -16,7 +16,7 @@ import {
   COUCH_USERNAME,
   ELASTICSEARCH_HOST,
   GCM_API_KEY,
-  NODE_ENV,
+  NODE_ENV, NICOLE_USER_ID,
 } from "./config"
 import {
   couchProxyRouter,
@@ -132,6 +132,33 @@ app.get('/rideMap/:url', (req, res, next) => {
   }
   const decoded = new Buffer(req.params.url, 'base64').toString('ascii')
   RideMap.getOrFetch(decoded, error, success)
+})
+
+app.get('/unfollow', (req, res) => {
+  const couchService = new CouchService(
+    configGet(COUCH_USERNAME),
+    configGet(COUCH_PASSWORD),
+    configGet(COUCH_HOST)
+  )
+  couchService.request('GET', `/users/_all_docs`, {include_docs: true}, false).then(resp => {
+    let request = Promise.resolve()
+    for (let row of resp.rows) {
+      const doc = row.doc
+      if (doc.type === 'follow' && doc.followerID === configGet(NICOLE_USER_ID)) {
+        doc.deleted = true
+        request = request.then(() => {
+          return couchService.request('put', `/users/${doc._id}`, {}, false, doc).then(resp => {
+            console.log(resp)
+          }).catch(e => {
+            console.log('error', e)
+          })
+        })
+      }
+    }
+    request.then(() => {
+      res.json({})
+    })
+  })
 })
 
 app.get('/replicateProd', async (req, res) => {
